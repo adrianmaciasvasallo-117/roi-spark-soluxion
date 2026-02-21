@@ -15,11 +15,14 @@ interface Props {
 
 const PropuestaSection = ({ data, results, onReset }: Props) => {
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [generated, setGenerated] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const { toast } = useToast();
+
+  const getFileName = () =>
+    `Propuesta_Soluxion_${data.empresa.replace(/\s+/g, '_')}_${data.fechaElaboracion}.pdf`;
 
   const validate = (): string | null => {
     if (!data.empresa.trim()) return 'El campo "Empresa" es obligatorio.';
@@ -32,6 +35,17 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
     return null;
   };
 
+  const triggerDownload = (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = getFileName();
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   const handleGenerate = async () => {
     const error = validate();
     if (error) {
@@ -42,9 +56,9 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
     try {
       const blob = await generatePDF(data, results);
       setPdfBlob(blob);
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-      setPdfUrl(URL.createObjectURL(blob));
-      toast({ title: 'PDF generado correctamente' });
+      setGenerated(true);
+      triggerDownload(blob);
+      toast({ title: 'PDF generado y descargado correctamente' });
     } catch (e) {
       toast({
         title: 'Error',
@@ -161,24 +175,12 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
             </Button>
           </div>
 
-          {pdfUrl && (
+          {generated && pdfBlob && (
             <div className="flex gap-3 flex-wrap items-center mt-2">
-              <a
-                href={pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80"
-              >
-                <FileText className="h-4 w-4" />
-                Abrir PDF en nueva pestaña
-              </a>
-              <a
-                href={pdfUrl}
-                download={`Propuesta_Soluxion_${data.empresa.replace(/\s+/g, '_')}_${data.fechaElaboracion}.pdf`}
-                className="inline-flex items-center gap-2 text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80"
-              >
-                Descargar PDF
-              </a>
+              <Button variant="outline" size="sm" onClick={() => triggerDownload(pdfBlob)}>
+                <FileText className="h-4 w-4 mr-2" />
+                Descargar PDF de nuevo
+              </Button>
             </div>
           )}
         </CardContent>
