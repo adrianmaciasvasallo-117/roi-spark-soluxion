@@ -162,13 +162,23 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
           </div>
 
           {pdfUrl && (
-            <div className="border rounded-lg overflow-hidden">
-              <iframe
-                src={pdfUrl}
-                className="w-full"
-                style={{ height: '70vh', minHeight: 400 }}
-                title="Vista previa PDF"
-              />
+            <div className="flex gap-3 flex-wrap items-center mt-2">
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+              >
+                <FileText className="h-4 w-4" />
+                Abrir PDF en nueva pestaña
+              </a>
+              <a
+                href={pdfUrl}
+                download={`Propuesta_Soluxion_${data.empresa.replace(/\s+/g, '_')}_${data.fechaElaboracion}.pdf`}
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+              >
+                Descargar PDF
+              </a>
             </div>
           )}
         </CardContent>
