@@ -260,9 +260,10 @@ export async function generatePDF(
     ['Fee mensual final', formatCurrency(results.feeFinal)],
     ['Rango sugerido mensual', rangoText],
   ];
-  if (data.costeSetup > 0) {
-    totalBody.push(['Setup (puesta en marcha)', formatCurrency(data.costeSetup)]);
+  if (results.totalSetup > 0) {
+    totalBody.push(['Setup (puesta en marcha)', formatCurrency(results.totalSetup)]);
   }
+  totalBody.push(['Inversión primer año', formatCurrency(results.totalFirstYear)]);
 
   autoTable(doc, {
     startY: y,
