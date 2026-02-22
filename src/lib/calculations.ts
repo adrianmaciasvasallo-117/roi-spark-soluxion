@@ -8,7 +8,8 @@ export interface AutomationItem {
   nombre: string;
   descripcion: string;
   beneficios: string[];
-  minMensual: number;
+  minMonthly: number;
+  defaultSetup: number;
 }
 
 export const AUTOMATIONS_CATALOG: AutomationItem[] = [
@@ -22,7 +23,8 @@ export const AUTOMATIONS_CATALOG: AutomationItem[] = [
       'Reducción del tiempo de respuesta a segundos',
       'Integración con CRM',
     ],
-    minMensual: 500,
+    minMonthly: 500,
+    defaultSetup: 0,
   },
   {
     id: 'voz',
@@ -34,7 +36,8 @@ export const AUTOMATIONS_CATALOG: AutomationItem[] = [
       'Derivación inteligente',
       'Disponibilidad fuera de horario',
     ],
-    minMensual: 700,
+    minMonthly: 700,
+    defaultSetup: 0,
   },
   {
     id: 'email',
@@ -46,7 +49,8 @@ export const AUTOMATIONS_CATALOG: AutomationItem[] = [
       'Reducción de tareas manuales de email',
       'Mejora en tasas de conversión',
     ],
-    minMensual: 0,
+    minMonthly: 250,
+    defaultSetup: 0,
   },
   {
     id: 'crm',
@@ -58,7 +62,8 @@ export const AUTOMATIONS_CATALOG: AutomationItem[] = [
       'Informes y métricas en tiempo real',
       'Centralización de datos de clientes',
     ],
-    minMensual: 0,
+    minMonthly: 400,
+    defaultSetup: 1200,
   },
   {
     id: 'web',
@@ -70,11 +75,18 @@ export const AUTOMATIONS_CATALOG: AutomationItem[] = [
       'Integración con CRM y email',
       'Análisis de comportamiento',
     ],
-    minMensual: 0,
+    minMonthly: 150,
+    defaultSetup: 900,
   },
 ];
 
 export type Frecuencia = 'diaria' | 'semanal' | 'mensual';
+
+/** Per-automation overrides for monthly price and setup fee */
+export interface AutomationPriceOverride {
+  monthlyPrice: number;
+  setupFee: number;
+}
 
 export interface FormData {
   empresa: string;
@@ -107,11 +119,14 @@ export interface FormData {
   porcentajeAutomatizable: number;
 
   porcentajeCobro: number;
-  costeSetup: number;
+  costeSetup: number; // kept for legacy/override — totalSetup is now computed
   overrideEnabled: boolean;
   feeMensualOverride: number;
+  autoDistributeRemainder: boolean;
 
   selectedAutomations: string[];
+  /** Per-automation price overrides keyed by automation id */
+  automationOverrides: Record<string, AutomationPriceOverride>;
 }
 
 export const DEFAULT_FORM_DATA: FormData = {
@@ -149,8 +164,10 @@ export const DEFAULT_FORM_DATA: FormData = {
   costeSetup: 0,
   overrideEnabled: false,
   feeMensualOverride: 0,
+  autoDistributeRemainder: true,
 
   selectedAutomations: [],
+  automationOverrides: {},
 };
 
 export const EXAMPLE_DATA: Partial<FormData> = {
@@ -173,6 +190,23 @@ export const EXAMPLE_DATA: Partial<FormData> = {
   selectedAutomations: ['whatsapp', 'email', 'crm'],
   rgpdChecked: true,
 };
+
+// ============================================================
+// Helper: get effective monthly price / setup for an automation
+// ============================================================
+export function getEffectiveMonthly(data: FormData, id: string): number {
+  const item = AUTOMATIONS_CATALOG.find((a) => a.id === id);
+  if (!item) return 0;
+  const override = data.automationOverrides[id];
+  return override ? Math.max(override.monthlyPrice, item.minMonthly) : item.minMonthly;
+}
+
+export function getEffectiveSetup(data: FormData, id: string): number {
+  const item = AUTOMATIONS_CATALOG.find((a) => a.id === id);
+  if (!item) return 0;
+  const override = data.automationOverrides[id];
+  return override ? Math.max(override.setupFee, item.defaultSetup) : item.defaultSetup;
+}
 
 // ============================================================
 // Results
@@ -202,13 +236,12 @@ export interface Results {
   rangoMin: number;
   rangoMax: number;
   allocationPrices: Record<string, number>;
+  totalSetup: number;
+  totalFirstYear: number;
 }
 
 export function calculateResults(data: FormData): Results {
-  // Frequency factor: converts task frequency to daily equivalent
-  // diaria: factor = 1
-  // semanal: factor = 1 / diasLaborablesSemana
-  // mensual: factor = 1 / diasLaborablesMes
+  // Frequency factor
   let factor = 1;
   if (data.frecuencia === 'semanal') factor = 1 / data.diasLaborablesSemana;
   if (data.frecuencia === 'mensual') factor = 1 / data.diasLaborablesMes;
@@ -218,73 +251,101 @@ export function calculateResults(data: FormData): Results {
   if (data.modoRapido) {
     horasPerdidasDia = data.horasPerdidasDiaInput;
   } else {
-    // Minutos perdidos al día = Nº empleados * Nº tareas * Minutos/tarea * factor
     const minutosPerdidos = data.numEmpleados * data.numTareas * data.minutosPorTarea * factor;
-    // Horas perdidas al día = (minutosPerdidos / 60) + gestión + retrabajo
     horasPerdidasDia = minutosPerdidos / 60 + data.horasGestion + data.horasRetrabajo;
   }
 
   // 1) Pérdida de Tiempo
-  // Horas perdidas al mes = Horas perdidas/día * Días laborables/mes
   const horasPerdidasMes = horasPerdidasDia * data.diasLaborablesMes;
-  // Tarifa por hora (€/h) = Salario mensual / Horas laborables/mes
   const tarifaHora = data.horasLaborablesMes > 0 ? data.salarioMensual / data.horasLaborablesMes : 0;
-  // Costo mensual en tiempo (€) = Horas perdidas/mes * Tarifa/hora
   const costoTiempo = horasPerdidasMes * tarifaHora;
 
   // 2) Oportunidades y Dinero Perdido
-  // Ventas perdidas (uds/mes) = Leads perdidos * (Tasa conversión / 100)
   const ventasPerdidas = data.leadsPerdidos * (data.tasaConversion / 100);
-  // Ingreso perdido mensual (€) = Ventas perdidas * Ticket promedio
   const ingresoPerdido = ventasPerdidas * data.ticketPromedio;
 
   // 3) Costos Operativos Evitables
-  // Costo evitable mensual (€) = Salario recurso * (% automatizable / 100)
   const costoEvitable = data.salarioSustituible * (data.porcentajeAutomatizable / 100);
 
   // 4) Resumen
-  // Pérdida total mensual (€/mes) = costoTiempo + ingresoPerdido + costoEvitable
   const perdidaTotal = costoTiempo + ingresoPerdido + costoEvitable;
-  // Ahorro anual bruto (€) = Pérdida total * 12 (assumes 100% automation)
   const ahorroAnualBruto = perdidaTotal * 12;
 
-  // PRICING
-  // Fee mensual sugerido = (Ahorro anual bruto * % cobro) / 12
+  // PRICING — new model with per-automation prices
   const feeSugerido = (ahorroAnualBruto * data.porcentajeCobro) / 100 / 12;
 
-  // Min total from selected automations
+  // Base monthly sum = sum of effective monthly prices
+  const baseMonthlySum = data.selectedAutomations.reduce(
+    (sum, id) => sum + getEffectiveMonthly(data, id),
+    0
+  );
+
+  // Min total (hard floor)
   const minTotal = data.selectedAutomations.reduce((sum, id) => {
     const item = AUTOMATIONS_CATALOG.find((a) => a.id === id);
-    return sum + (item?.minMensual || 0);
+    return sum + (item?.minMonthly || 0);
   }, 0);
 
-  // Fee mensual final = max(feeSugerido, minTotal) unless override
+  // Build allocation prices
+  const allocationPrices: Record<string, number> = {};
+  data.selectedAutomations.forEach((id) => {
+    allocationPrices[id] = getEffectiveMonthly(data, id);
+  });
+
+  // Auto-distribute remainder
+  if (data.autoDistributeRemainder && !data.overrideEnabled) {
+    const targetMonthly = feeSugerido;
+    const remainder = Math.max(0, targetMonthly - baseMonthlySum);
+    if (remainder > 0) {
+      // Priority: email > crm > last selected
+      const priority = ['email', 'crm'];
+      let assigned = false;
+      for (const pid of priority) {
+        if (data.selectedAutomations.includes(pid)) {
+          allocationPrices[pid] = (allocationPrices[pid] || 0) + remainder;
+          assigned = true;
+          break;
+        }
+      }
+      if (!assigned && data.selectedAutomations.length > 0) {
+        const last = data.selectedAutomations[data.selectedAutomations.length - 1];
+        allocationPrices[last] = (allocationPrices[last] || 0) + remainder;
+      }
+    }
+  }
+
+  // Fee final
   let feeFinal: number;
   if (data.overrideEnabled) {
     feeFinal = Math.max(data.feeMensualOverride, minTotal);
   } else {
-    feeFinal = Math.max(feeSugerido, minTotal);
+    const sumAllocation = Object.values(allocationPrices).reduce((s, v) => s + v, 0);
+    feeFinal = Math.max(sumAllocation, minTotal);
   }
+
+  // Total setup
+  const totalSetup = data.selectedAutomations.reduce(
+    (sum, id) => sum + getEffectiveSetup(data, id),
+    0
+  );
 
   // Savings
   const costoActual = perdidaTotal;
   const costoTrasAutomatizacion = feeFinal;
   const ahorroMensualNeto = costoActual - costoTrasAutomatizacion;
   const ahorroAnualNeto = ahorroMensualNeto * 12;
-  // Ahorro (%) = (Ahorro mensual neto / Coste actual) * 100
   const ahorroPorcentaje = costoActual > 0 ? (ahorroMensualNeto / costoActual) * 100 : 0;
 
-  // ROI and Payback
+  // ROI — does NOT include setup (Option C)
   const costoAnual = feeFinal * 12;
-  // ROI (%) = (Ahorro anual neto / Coste anual) * 100
   const roi = costoAnual > 0 ? (ahorroAnualNeto / costoAnual) * 100 : 0;
 
+  // Payback — based on total setup
   let payback: number | 'no_recuperable';
-  if (data.costeSetup === 0) {
+  if (totalSetup === 0) {
     payback = 0;
   } else if (ahorroMensualNeto > 0) {
-    // Payback (meses) = Setup / Ahorro mensual neto
-    payback = data.costeSetup / ahorroMensualNeto;
+    payback = totalSetup / ahorroMensualNeto;
   } else {
     payback = 'no_recuperable';
   }
@@ -293,8 +354,8 @@ export function calculateResults(data: FormData): Results {
   const rangoMin = (ahorroAnualBruto * 0.15) / 12;
   const rangoMax = (ahorroAnualBruto * 0.25) / 12;
 
-  // Allocation
-  const allocationPrices = allocateAutomationPrices(data.selectedAutomations, feeFinal);
+  // Total first year
+  const totalFirstYear = feeFinal * 12 + totalSetup;
 
   return {
     horasPerdidasDia,
@@ -320,66 +381,9 @@ export function calculateResults(data: FormData): Results {
     rangoMin,
     rangoMax,
     allocationPrices,
+    totalSetup,
+    totalFirstYear,
   };
-}
-
-// ============================================================
-// Automation price allocation
-// ============================================================
-function allocateAutomationPrices(
-  selectedIds: string[],
-  feeFinal: number
-): Record<string, number> {
-  if (selectedIds.length === 0) return {};
-
-  const selected = selectedIds
-    .map((id) => AUTOMATIONS_CATALOG.find((a) => a.id === id)!)
-    .filter(Boolean);
-  const sumMin = selected.reduce((s, a) => s + a.minMensual, 0);
-
-  // Weights: proportional to minimums if any, else equal
-  const weights: Record<string, number> = {};
-  if (sumMin > 0) {
-    selected.forEach((a) => {
-      weights[a.id] = a.minMensual / sumMin;
-    });
-  } else {
-    selected.forEach((a) => {
-      weights[a.id] = 1 / selected.length;
-    });
-  }
-
-  const prices: Record<string, number> = {};
-  let allocated = 0;
-
-  selected.forEach((a, i) => {
-    if (i === selected.length - 1) {
-      // Last item gets remainder to avoid rounding drift
-      prices[a.id] = Math.round((feeFinal - allocated) * 100) / 100;
-    } else {
-      const price = Math.round(feeFinal * weights[a.id] * 100) / 100;
-      prices[a.id] = Math.max(price, a.minMensual);
-      allocated += prices[a.id];
-    }
-  });
-
-  // Ensure last item meets minimum
-  const lastItem = selected[selected.length - 1];
-  if (prices[lastItem.id] < lastItem.minMensual) {
-    const deficit = lastItem.minMensual - prices[lastItem.id];
-    prices[lastItem.id] = lastItem.minMensual;
-    const adjustable = selected.filter(
-      (a) => a.id !== lastItem.id && a.minMensual === 0
-    );
-    if (adjustable.length > 0) {
-      const perItem = deficit / adjustable.length;
-      adjustable.forEach((a) => {
-        prices[a.id] = Math.max(0, prices[a.id] - perItem);
-      });
-    }
-  }
-
-  return prices;
 }
 
 // ============================================================

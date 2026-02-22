@@ -136,16 +136,16 @@ const ResultadosSection = ({ results, data }: Props) => {
 
   // 5) Line: Payback timeline
   const paybackChartData = useMemo(() => {
-    if (data.costeSetup <= 0 || results.ahorroMensualNeto <= 0) return null;
+    if (results.totalSetup <= 0 || results.ahorroMensualNeto <= 0) return null;
     const maxMonths = Math.min(
-      Math.ceil((data.costeSetup / results.ahorroMensualNeto) * 2),
+      Math.ceil((results.totalSetup / results.ahorroMensualNeto) * 2),
       24
     );
     const labels = Array.from({ length: maxMonths }, (_, i) => `${i + 1}`);
     const cumulative = labels.map(
       (_, i) => results.ahorroMensualNeto * (i + 1)
     );
-    const setupLine = labels.map(() => data.costeSetup);
+    const setupLine = labels.map(() => results.totalSetup);
     return {
       labels,
       datasets: [
@@ -165,7 +165,7 @@ const ResultadosSection = ({ results, data }: Props) => {
         },
       ],
     };
-  }, [data.costeSetup, results.ahorroMensualNeto]);
+  }, [results.totalSetup, results.ahorroMensualNeto]);
 
   // 6) Doughnut: Fee breakdown
   const selectedItems = data.selectedAutomations
@@ -241,6 +241,17 @@ const ResultadosSection = ({ results, data }: Props) => {
           value={formatCurrency(results.feeFinal)}
           sub={`Rango: ${rangoText}`}
         />
+        {results.totalSetup > 0 && (
+          <KPI
+            label="Setup total"
+            value={formatCurrency(results.totalSetup)}
+          />
+        )}
+        <KPI
+          label="Inversión 1er año"
+          value={formatCurrency(results.totalFirstYear)}
+          accent
+        />
       </div>
 
       {/* Charts */}
@@ -302,7 +313,7 @@ const ResultadosSection = ({ results, data }: Props) => {
               <CardTitle className="text-sm">Payback timeline</CardTitle>
             </CardHeader>
             <CardContent className="h-56 flex items-center justify-center text-sm text-muted-foreground">
-              {data.costeSetup <= 0
+              {results.totalSetup <= 0
                 ? 'Sin coste de setup – payback inmediato'
                 : 'Ahorro insuficiente para recuperar setup'}
             </CardContent>
