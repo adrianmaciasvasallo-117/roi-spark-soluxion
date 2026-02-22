@@ -22,31 +22,43 @@ import {
   formatPercent,
 } from './calculations';
 
-// Ensure Chart.js is registered
 ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
+  CategoryScale, LinearScale, BarElement, LineElement,
+  PointElement, ArcElement, Title, Tooltip, Legend, Filler
 );
 
+// ── Color System ──
+const COLOR = {
+  loss:       [179, 38, 30]   as [number, number, number], // #B3261E
+  positive:   [46, 158, 111]  as [number, number, number], // #2E9E6F
+  investment: [30, 58, 138]   as [number, number, number], // #1E3A8A
+  neutral:    [71, 85, 105]   as [number, number, number], // #475569
+  white:      [255, 255, 255] as [number, number, number],
+  black:      [0, 0, 0]       as [number, number, number],
+  lightGray:  [248, 250, 252] as [number, number, number],
+  border:     [226, 232, 240] as [number, number, number],
+};
+
+const MARGIN = 18;
+const PAGE_W = 210;
+const CONTENT_W = PAGE_W - MARGIN * 2;
+
+// ── High-res chart renderer (3x pixel ratio) ──
 function renderChartToImage(
   type: 'bar' | 'line' | 'doughnut',
   data: any,
   options: any,
-  width = 500,
-  height = 250
+  logicalW = 500,
+  logicalH = 250
 ): string {
+  const ratio = 3;
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = logicalW * ratio;
+  canvas.height = logicalH * ratio;
+  canvas.style.width = `${logicalW}px`;
+  canvas.style.height = `${logicalH}px`;
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(ratio, ratio);
   const chart = new ChartJS(ctx, {
     type,
     data,
@@ -54,101 +66,192 @@ function renderChartToImage(
       ...options,
       animation: false,
       responsive: false,
+      devicePixelRatio: ratio,
     },
   });
-  const image = canvas.toDataURL('image/png');
+  const image = canvas.toDataURL('image/png', 1.0);
   chart.destroy();
   return image;
 }
 
-async function loadLogoBase64(): Promise<string | null> {
+// ── Logo loader with aspect ratio preservation ──
+async function loadLogo(): Promise<{ base64: string; w: number; h: number } | null> {
   try {
     const response = await fetch('/soluxion-logo.png');
     const blob = await response.blob();
-    return new Promise((resolve) => {
+    const base64: string = await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
       reader.readAsDataURL(blob);
     });
+    // Get natural dimensions
+    const img = new Image();
+    await new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+      img.src = base64;
+    });
+    return { base64, w: img.naturalWidth, h: img.naturalHeight };
   } catch {
     return null;
   }
 }
 
-export async function generatePDF(
-  data: FormData,
-  results: Results
-): Promise<Blob> {
+function addLogoToDoc(doc: jsPDF, logo: { base64: string; w: number; h: number }, maxW: number, x: number, y: number): number {
+  const aspect = logo.w / logo.h;
+  const finalW = Math.min(maxW, logo.w * 0.264583); // px to mm rough
+  const finalH = finalW / aspect;
+  const cappedW = Math.min(finalW, 42);
+  const cappedH = cappedW / aspect;
+  try {
+    doc.addImage(logo.base64, 'PNG', x, y, cappedW, cappedH);
+  } catch { /* skip */ }
+  return cappedH;
+}
+
+// ── Helpers ──
+function sectionTitle(doc: jsPDF, text: string, y: number, color: [number, number, number] = COLOR.black): number {
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...color);
+  doc.text(text, MARGIN, y);
+  return y + 7;
+}
+
+function addPageIfNeeded(doc: jsPDF, y: number, needed: number): number {
+  if (y + needed > 275) {
+    doc.addPage();
+    return MARGIN;
+  }
+  return y;
+}
+
+// ── Executive KPI Block ──
+function drawKpiBlock(
+  doc: jsPDF,
+  x: number, y: number, w: number, h: number,
+  label: string, value: string,
+  valueColor: [number, number, number],
+  fontSize: number
+) {
+  // Subtle background
+  doc.setFillColor(valueColor[0], valueColor[1], valueColor[2]);
+  doc.setGState(new (doc as any).GState({ opacity: 0.06 }));
+  doc.roundedRect(x, y, w, h, 2, 2, 'F');
+  doc.setGState(new (doc as any).GState({ opacity: 1 }));
+
+  // Left accent
+  doc.setFillColor(...valueColor);
+  doc.rect(x, y, 2.5, h, 'F');
+
+  // Label
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...COLOR.neutral);
+  doc.text(label.toUpperCase(), x + 7, y + 9);
+
+  // Value
+  doc.setFontSize(fontSize);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...valueColor);
+  doc.text(value, x + 7, y + h - 6);
+}
+
+// ══════════════════════════════════════
+//  MAIN GENERATOR
+// ══════════════════════════════════════
+export async function generatePDF(data: FormData, results: Results): Promise<Blob> {
   const doc = new jsPDF('p', 'mm', 'a4');
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 15;
-  const contentWidth = pageWidth - margin * 2;
-  let y = margin;
+  let y = MARGIN;
 
-  const navy = [45, 55, 72] as [number, number, number];
-  const white = [255, 255, 255] as [number, number, number];
-  const gray = [120, 120, 120] as [number, number, number];
+  const logo = await loadLogo();
 
-  const addPageIfNeeded = (needed: number) => {
-    if (y + needed > 275) {
-      doc.addPage();
-      y = margin;
-    }
-  };
+  const paybackText =
+    results.payback === 'no_recuperable' ? 'No recuperable'
+    : results.payback === 0 ? 'Inmediato'
+    : `${formatNumber(results.payback as number)} meses`;
 
-  // ---- COVER ----
-  const logo = await loadLogoBase64();
+  // ════════════════════════════════════
+  //  PAGE 1 — EXECUTIVE COVER
+  // ════════════════════════════════════
 
-  // Navy header bar
-  doc.setFillColor(...navy);
-  doc.rect(0, 0, pageWidth, 50, 'F');
+  // Header bar
+  doc.setFillColor(...COLOR.investment);
+  doc.rect(0, 0, PAGE_W, 44, 'F');
 
   if (logo) {
-    try {
-      doc.addImage(logo, 'JPEG', margin, 8, 35, 35);
-    } catch { /* skip logo if format issue */ }
+    addLogoToDoc(doc, logo, 42, MARGIN, 6);
   }
 
-  doc.setTextColor(...white);
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Soluxion', margin + 40, 22);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('soluxion.ai@gmail.com  |  +34 632 14 43 98', margin + 40, 30);
-  doc.text('Propuesta de Automatización', margin + 40, 38);
-
-  y = 60;
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text(data.empresa || 'Empresa', margin, y);
-  y += 7;
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Cliente: ${data.nombreCliente}`, margin, y);
-  y += 5;
-  doc.text(`Fecha: ${data.fechaElaboracion}`, margin, y);
-  y += 10;
-
-  // Executive summary
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Resumen Ejecutivo', margin, y);
-  y += 6;
+  doc.setTextColor(...COLOR.white);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  const summary = `Tras analizar los procesos de ${data.empresa}, identificamos una pérdida mensual de ${formatCurrency(results.costoActual)} (${formatNumber(results.horasPerdidasMes)} horas/mes en tareas repetitivas). Con la automatización propuesta, el ahorro neto anual estimado asciende a ${formatCurrency(results.ahorroAnualNeto)}, lo que supone un ROI del ${formatPercent(results.roi)}.`;
-  const summaryLines = doc.splitTextToSize(summary, contentWidth);
-  doc.text(summaryLines, margin, y);
-  y += summaryLines.length * 4.5 + 8;
-
-  // ---- SECTION 2: Análisis Actual ----
-  addPageIfNeeded(50);
-  doc.setFontSize(12);
+  doc.text('soluxion.ai@gmail.com  |  +34 632 14 43 98', MARGIN + 46, 18);
+  doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('Análisis Actual', margin, y);
-  y += 6;
+  doc.text('Soluxion', MARGIN + 46, 32);
+
+  y = 54;
+
+  // Title block
+  doc.setTextColor(...COLOR.black);
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Propuesta de Automatización', MARGIN, y);
+  y += 9;
+
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...COLOR.neutral);
+  doc.text(data.empresa || 'Empresa', MARGIN, y);
+  y += 5.5;
+  doc.text(`Cliente: ${data.nombreCliente}`, MARGIN, y);
+  y += 5.5;
+  doc.text(`Fecha: ${data.fechaElaboracion}`, MARGIN, y);
+  y += 14;
+
+  // ── 4 KPI Blocks ──
+  const blockW = (CONTENT_W - 6) / 2;
+  const blockH = 28;
+
+  // Row 1
+  drawKpiBlock(doc, MARGIN, y, blockW, blockH,
+    'Pérdida mensual actual', formatCurrency(results.perdidaTotal),
+    COLOR.loss, 18);
+
+  drawKpiBlock(doc, MARGIN + blockW + 6, y, blockW, blockH,
+    'Ahorro anual estimado', formatCurrency(results.ahorroAnualNeto),
+    COLOR.positive, 20);
+
+  y += blockH + 6;
+
+  // Row 2
+  drawKpiBlock(doc, MARGIN, y, blockW, blockH,
+    'Inversión anual', formatCurrency(results.costoAnual),
+    COLOR.investment, 16);
+
+  drawKpiBlock(doc, MARGIN + blockW + 6, y, blockW, blockH,
+    'Recuperación', paybackText,
+    results.ahorroMensualNeto > 0 ? COLOR.positive : COLOR.neutral, 16);
+
+  y += blockH + 14;
+
+  // Executive paragraph
+  doc.setFontSize(9.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...COLOR.neutral);
+  const summary = `Tras analizar los procesos de ${data.empresa}, identificamos una pérdida mensual de ${formatCurrency(results.costoActual)} (${formatNumber(results.horasPerdidasMes)} horas/mes en tareas repetitivas). Con la automatización propuesta, el ahorro neto anual estimado asciende a ${formatCurrency(results.ahorroAnualNeto)}, lo que supone un ROI del ${formatPercent(results.roi)}.`;
+  const lines = doc.splitTextToSize(summary, CONTENT_W);
+  doc.text(lines, MARGIN, y);
+  y += lines.length * 4.5;
+
+  // ════════════════════════════════════
+  //  PAGE 2 — ANALYSIS + AUTOMATIONS
+  // ════════════════════════════════════
+  doc.addPage();
+  y = MARGIN;
+
+  // Section: Análisis Actual
+  y = sectionTitle(doc, 'Análisis Actual', y, COLOR.loss);
 
   autoTable(doc, {
     startY: y,
@@ -162,18 +265,17 @@ export async function generatePDF(
       ['Pérdida total (€/mes)', formatCurrency(results.perdidaTotal)],
     ],
     theme: 'grid',
-    headStyles: { fillColor: navy, textColor: white },
-    styles: { fontSize: 9 },
-    margin: { left: margin, right: margin },
+    headStyles: { fillColor: COLOR.loss, textColor: COLOR.white, fontStyle: 'bold' },
+    styles: { fontSize: 9, cellPadding: 3.5 },
+    bodyStyles: { textColor: COLOR.neutral },
+    columnStyles: { 1: { textColor: COLOR.loss, fontStyle: 'bold' } },
+    margin: { left: MARGIN, right: MARGIN },
   });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = (doc as any).lastAutoTable.finalY + 10;
 
-  // ---- SECTION 3: Ahorro Proyectado ----
-  addPageIfNeeded(50);
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Ahorro Proyectado', margin, y);
-  y += 6;
+  // Section: Ahorro Proyectado
+  y = addPageIfNeeded(doc, y, 50);
+  y = sectionTitle(doc, 'Ahorro Proyectado', y, COLOR.positive);
 
   autoTable(doc, {
     startY: y,
@@ -182,54 +284,25 @@ export async function generatePDF(
       ['Ahorro mensual neto', formatCurrency(results.ahorroMensualNeto)],
       ['Ahorro anual neto', formatCurrency(results.ahorroAnualNeto)],
       ['Ahorro (%)', formatPercent(results.ahorroPorcentaje)],
-    ],
-    theme: 'grid',
-    headStyles: { fillColor: navy, textColor: white },
-    styles: { fontSize: 9 },
-    margin: { left: margin, right: margin },
-  });
-  y = (doc as any).lastAutoTable.finalY + 8;
-
-  // ---- SECTION 4: ROI + Payback ----
-  addPageIfNeeded(40);
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text('ROI y Payback', margin, y);
-  y += 6;
-
-  const paybackText =
-    results.payback === 'no_recuperable'
-      ? 'No recuperable'
-      : results.payback === 0
-        ? 'Inmediato'
-        : `${formatNumber(results.payback as number)} meses`;
-
-  autoTable(doc, {
-    startY: y,
-    head: [['Métrica', 'Valor']],
-    body: [
       ['ROI', formatPercent(results.roi)],
-      ['Payback', paybackText],
-      ['Coste anual', formatCurrency(results.costoAnual)],
     ],
     theme: 'grid',
-    headStyles: { fillColor: navy, textColor: white },
-    styles: { fontSize: 9 },
-    margin: { left: margin, right: margin },
+    headStyles: { fillColor: COLOR.positive, textColor: COLOR.white, fontStyle: 'bold' },
+    styles: { fontSize: 9, cellPadding: 3.5 },
+    bodyStyles: { textColor: COLOR.neutral },
+    columnStyles: { 1: { textColor: COLOR.positive, fontStyle: 'bold' } },
+    margin: { left: MARGIN, right: MARGIN },
   });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = (doc as any).lastAutoTable.finalY + 10;
 
-  // ---- SECTION 5: Automatizaciones ----
+  // Section: Automatizaciones
   const selectedItems = data.selectedAutomations
     .map((id) => AUTOMATIONS_CATALOG.find((a) => a.id === id)!)
     .filter(Boolean);
 
   if (selectedItems.length > 0) {
-    addPageIfNeeded(60);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Automatizaciones Seleccionadas', margin, y);
-    y += 6;
+    y = addPageIfNeeded(doc, y, 60);
+    y = sectionTitle(doc, 'Automatizaciones Seleccionadas', y, COLOR.investment);
 
     autoTable(doc, {
       startY: y,
@@ -240,23 +313,21 @@ export async function generatePDF(
         formatCurrency(results.allocationPrices[item.id] || 0),
       ]),
       theme: 'grid',
-      headStyles: { fillColor: navy, textColor: white },
-      styles: { fontSize: 8, cellPadding: 3 },
-      columnStyles: { 1: { cellWidth: 80 } },
-      margin: { left: margin, right: margin },
+      headStyles: { fillColor: COLOR.investment, textColor: COLOR.white, fontStyle: 'bold' },
+      styles: { fontSize: 8.5, cellPadding: 3.5 },
+      bodyStyles: { textColor: COLOR.neutral },
+      columnStyles: { 2: { textColor: COLOR.investment, fontStyle: 'bold' } },
+      margin: { left: MARGIN, right: MARGIN },
     });
-    y = (doc as any).lastAutoTable.finalY + 8;
+    y = (doc as any).lastAutoTable.finalY + 10;
   }
 
-  // ---- SECTION 6: Total Propuesta ----
-  addPageIfNeeded(40);
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Total Propuesta', margin, y);
-  y += 6;
+  // Section: Total Propuesta
+  y = addPageIfNeeded(doc, y, 50);
+  y = sectionTitle(doc, 'Total Propuesta', y, COLOR.investment);
 
   const rangoText = `${formatCurrency(results.rangoMin)} – ${formatCurrency(results.rangoMax)}`;
-  const totalBody: string[][] = [
+  const totalBody: [string, string][] = [
     ['Fee mensual final', formatCurrency(results.feeFinal)],
     ['Rango sugerido mensual', rangoText],
   ];
@@ -269,110 +340,126 @@ export async function generatePDF(
     startY: y,
     body: totalBody,
     theme: 'plain',
-    styles: { fontSize: 10, fontStyle: 'bold' },
-    margin: { left: margin, right: margin },
+    styles: { fontSize: 10, cellPadding: 3.5 },
+    bodyStyles: { textColor: COLOR.neutral },
+    columnStyles: { 1: { textColor: COLOR.investment, fontStyle: 'bold' } },
+    margin: { left: MARGIN, right: MARGIN },
   });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = (doc as any).lastAutoTable.finalY + 10;
 
-  // ---- CHARTS ----
-  addPageIfNeeded(80);
-  doc.addPage();
-  y = margin;
-  doc.setFontSize(12);
+  // Payback card
+  y = addPageIfNeeded(doc, y, 25);
+  const pbColor = results.ahorroMensualNeto > 0 ? COLOR.positive : COLOR.neutral;
+  doc.setFillColor(pbColor[0], pbColor[1], pbColor[2]);
+  doc.setGState(new (doc as any).GState({ opacity: 0.07 }));
+  doc.roundedRect(MARGIN, y, CONTENT_W, 20, 2, 2, 'F');
+  doc.setGState(new (doc as any).GState({ opacity: 1 }));
+  doc.setFillColor(...pbColor);
+  doc.rect(MARGIN, y, 2.5, 20, 'F');
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...COLOR.neutral);
+  doc.text('PAYBACK', MARGIN + 8, y + 8);
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text('Gráficos', margin, y);
-  y += 8;
+  doc.setTextColor(...pbColor);
+  doc.text(paybackText, MARGIN + 8, y + 16);
+  y += 28;
 
-  // Cost comparison chart
-  const costChartImg = renderChartToImage(
-    'bar',
-    {
-      labels: ['Coste actual', 'Coste automatizado'],
-      datasets: [
-        {
-          data: [results.costoActual, results.costoTrasAutomatizacion],
-          backgroundColor: ['rgba(239,68,68,0.8)', 'rgba(59,130,246,0.8)'],
-          borderRadius: 4,
-        },
-      ],
-    },
-    {
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
-    }
-  );
-  doc.addImage(costChartImg, 'PNG', margin, y, contentWidth, 55);
+  // ════════════════════════════════════
+  //  PAGE 3 — IMPACT VISUALIZATION
+  // ════════════════════════════════════
+  doc.addPage();
+  y = MARGIN;
+  y = sectionTitle(doc, 'Impacto financiero proyectado', y, COLOR.investment);
+  y += 2;
+
+  // Chart 1: Cost comparison
+  const costImg = renderChartToImage('bar', {
+    labels: ['Coste actual', 'Coste automatizado'],
+    datasets: [{
+      data: [results.costoActual, results.costoTrasAutomatizacion],
+      backgroundColor: ['rgba(179,38,30,0.8)', 'rgba(30,58,138,0.8)'],
+      borderRadius: 4,
+    }],
+  }, {
+    plugins: { legend: { display: false }, title: { display: true, text: 'Coste mensual: actual vs automatizado', font: { size: 13 } } },
+    scales: { y: { beginAtZero: true } },
+  }, 600, 280);
+  doc.addImage(costImg, 'PNG', MARGIN, y, CONTENT_W, 55);
   y += 60;
 
-  // Cumulative savings
-  addPageIfNeeded(70);
+  // Chart 2: Cumulative savings
+  y = addPageIfNeeded(doc, y, 65);
   const months = Array.from({ length: 12 }, (_, i) => `M${i + 1}`);
-  const cumSavings = months.map(
-    (_, i) => results.ahorroMensualNeto * (i + 1)
-  );
-  const savingsImg = renderChartToImage(
-    'line',
-    {
-      labels: months,
-      datasets: [
-        {
-          label: 'Ahorro acumulado (€)',
-          data: cumSavings,
-          borderColor: 'rgba(59,130,246,0.9)',
-          backgroundColor: 'rgba(59,130,246,0.1)',
-          fill: true,
-          tension: 0.3,
-        },
-      ],
-    },
-    {
-      plugins: { legend: { position: 'bottom' } },
-      scales: { y: { beginAtZero: true } },
-    }
-  );
-  doc.addImage(savingsImg, 'PNG', margin, y, contentWidth, 55);
+  const cumSavings = months.map((_, i) => results.ahorroMensualNeto * (i + 1));
+  const savingsImg = renderChartToImage('line', {
+    labels: months,
+    datasets: [{
+      label: 'Ahorro acumulado (€)',
+      data: cumSavings,
+      borderColor: 'rgba(46,158,111,0.95)',
+      backgroundColor: 'rgba(46,158,111,0.1)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+    }],
+  }, {
+    plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Ahorro acumulado (12 meses)', font: { size: 13 } } },
+    scales: { y: { beginAtZero: true } },
+  }, 600, 280);
+  doc.addImage(savingsImg, 'PNG', MARGIN, y, CONTENT_W, 55);
   y += 60;
 
-  // Fee breakdown donut
+  // Chart 3: ROI
+  y = addPageIfNeeded(doc, y, 65);
+  const roiImg = renderChartToImage('bar', {
+    labels: ['ROI'],
+    datasets: [{
+      data: [results.roi],
+      backgroundColor: ['rgba(46,158,111,0.85)'],
+      borderRadius: 4,
+    }],
+  }, {
+    indexAxis: 'y' as const,
+    plugins: { legend: { display: false }, title: { display: true, text: `ROI: ${formatPercent(results.roi)}`, font: { size: 13 } } },
+    scales: { x: { beginAtZero: true } },
+  }, 600, 180);
+  doc.addImage(savingsImg.length ? roiImg : roiImg, 'PNG', MARGIN, y, CONTENT_W, 35);
+  y += 40;
+
+  // Chart 4: Fee breakdown
   if (selectedItems.length > 0) {
-    addPageIfNeeded(70);
-    const colors = [
-      'rgba(59,130,246,0.8)',
-      'rgba(168,85,247,0.8)',
-      'rgba(34,197,94,0.8)',
-      'rgba(251,191,36,0.8)',
-      'rgba(239,68,68,0.8)',
+    y = addPageIfNeeded(doc, y, 70);
+    const blues = [
+      'rgba(30,58,138,0.9)',
+      'rgba(59,130,246,0.85)',
+      'rgba(96,165,250,0.8)',
+      'rgba(147,197,253,0.8)',
+      'rgba(30,58,138,0.6)',
     ];
-    const breakdownImg = renderChartToImage(
-      'doughnut',
-      {
-        labels: selectedItems.map((a) => a.nombre),
-        datasets: [
-          {
-            data: selectedItems.map(
-              (a) => results.allocationPrices[a.id] || 0
-            ),
-            backgroundColor: colors.slice(0, selectedItems.length),
-          },
-        ],
-      },
-      { plugins: { legend: { position: 'bottom' } } },
-      400,
-      250
-    );
-    doc.addImage(breakdownImg, 'PNG', margin + 20, y, contentWidth - 40, 55);
-    y += 60;
+    const breakdownImg = renderChartToImage('doughnut', {
+      labels: selectedItems.map((a) => a.nombre),
+      datasets: [{
+        data: selectedItems.map((a) => results.allocationPrices[a.id] || 0),
+        backgroundColor: blues.slice(0, selectedItems.length),
+      }],
+    }, {
+      plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Distribución de servicios', font: { size: 13 } } },
+    }, 450, 300);
+    doc.addImage(breakdownImg, 'PNG', MARGIN + 15, y, CONTENT_W - 30, 60);
+    y += 65;
   }
 
-  // ---- LEGAL ----
-  addPageIfNeeded(30);
+  // ── Legal footer ──
+  y = addPageIfNeeded(doc, y, 20);
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...gray);
-  const legal =
-    'Estimaciones basadas en los datos facilitados; los resultados pueden variar. Propuesta válida 30 días. Tratamiento de datos únicamente para el envío de esta propuesta conforme al RGPD.';
-  const legalLines = doc.splitTextToSize(legal, contentWidth);
-  doc.text(legalLines, margin, y);
+  doc.setTextColor(...COLOR.neutral);
+  const legal = 'Estimaciones basadas en los datos facilitados; los resultados pueden variar. Propuesta válida 30 días. Tratamiento de datos conforme al RGPD.';
+  const legalLines = doc.splitTextToSize(legal, CONTENT_W);
+  doc.text(legalLines, MARGIN, y);
 
   return doc.output('blob');
 }
