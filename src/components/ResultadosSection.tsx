@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Results,
   FormData,
@@ -22,6 +21,7 @@ import {
   Filler,
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 ChartJS.register(
   CategoryScale,
@@ -36,31 +36,54 @@ ChartJS.register(
   Filler
 );
 
+/* ── Color system ── */
+const LOSS = '#B3261E';
+const POSITIVE = '#2E9E6F';
+const PREMIUM = '#1E3A8A';
+const LABEL = '#475569';
+const LOSS_BG = 'rgba(179,38,30,0.00)';
+const POSITIVE_BG = 'rgba(46,158,111,0.08)';
+const PREMIUM_BG = 'rgba(30,58,138,0.08)';
+
+/* ── Metric card ── */
+interface MetricProps {
+  label: string;
+  value: string;
+  sub?: string;
+  color: string;
+  bg?: string;
+  borderColor?: string;
+  size?: 'lg' | 'md' | 'sm';
+}
+
+const Metric = ({ label, value, sub, color, bg = 'white', borderColor, size = 'sm' }: MetricProps) => {
+  const fontSize = size === 'lg' ? 'text-2xl' : size === 'md' ? 'text-xl' : 'text-lg';
+  return (
+    <div
+      className="rounded-lg border p-4 shadow-sm"
+      style={{
+        backgroundColor: bg,
+        borderLeft: borderColor ? `3px solid ${borderColor}` : undefined,
+      }}
+    >
+      <p className="text-xs font-medium mb-1" style={{ color: LABEL }}>{label}</p>
+      <p className={`${fontSize} font-bold`} style={{ color }}>{value}</p>
+      {sub && <p className="text-xs mt-0.5" style={{ color: LABEL }}>{sub}</p>}
+    </div>
+  );
+};
+
+/* ── Section header ── */
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: LABEL }}>
+    {children}
+  </p>
+);
+
 interface Props {
   results: Results;
   data: FormData;
 }
-
-const KPI = ({
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: boolean;
-}) => (
-  <div
-    className={`kpi-card ${accent ? 'border-l-4' : ''}`}
-    style={accent ? { borderLeftColor: 'hsl(210, 75%, 50%)' } : {}}
-  >
-    <p className="text-xs text-muted-foreground mb-1">{label}</p>
-    <p className="text-lg font-bold">{value}</p>
-    {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
-  </div>
-);
 
 const ResultadosSection = ({ results, data }: Props) => {
   const paybackText =
@@ -70,136 +93,15 @@ const ResultadosSection = ({ results, data }: Props) => {
         ? 'Inmediato'
         : `${formatNumber(results.payback as number)} meses`;
 
-  const rangoText = `${formatCurrency(results.rangoMin)} – ${formatCurrency(results.rangoMax)}`;
+  const paybackColor = results.ahorroMensualNeto > 0 ? POSITIVE : LABEL;
 
-  // Chart colors
-  const blue = 'rgba(59, 130, 246, 0.8)';
-  const green = 'rgba(34, 197, 94, 0.8)';
-  const red = 'rgba(239, 68, 68, 0.8)';
-  const blueLight = 'rgba(59, 130, 246, 0.15)';
-
-  // 1) Bar: Hours
-  const hoursChartData = {
-    labels: ['Horas actuales/mes', 'Post-automatización'],
-    datasets: [
-      {
-        data: [results.horasPerdidasMes, 0],
-        backgroundColor: [red, green],
-        borderRadius: 6,
-      },
-    ],
-  };
-
-  // 2) Bar: Cost
-  const costChartData = {
-    labels: ['Coste actual (€/mes)', 'Coste automatizado (€/mes)'],
-    datasets: [
-      {
-        data: [results.costoActual, results.costoTrasAutomatizacion],
-        backgroundColor: [red, blue],
-        borderRadius: 6,
-      },
-    ],
-  };
-
-  // 3) Line: Cumulative savings
-  const months = Array.from({ length: 12 }, (_, i) => `Mes ${i + 1}`);
-  const cumSavings = months.map(
-    (_, i) => results.ahorroMensualNeto * (i + 1)
-  );
-  const savingsChartData = {
-    labels: months,
-    datasets: [
-      {
-        label: 'Ahorro acumulado (€)',
-        data: cumSavings,
-        borderColor: blue,
-        backgroundColor: blueLight,
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3,
-      },
-    ],
-  };
-
-  // 4) Bar: ROI
-  const roiChartData = {
-    labels: ['ROI (%)'],
-    datasets: [
-      {
-        data: [Math.max(0, results.roi)],
-        backgroundColor: [green],
-        borderRadius: 6,
-      },
-    ],
-  };
-
-  // 5) Line: Payback timeline
-  const paybackChartData = useMemo(() => {
-    if (results.totalSetup <= 0 || results.ahorroMensualNeto <= 0) return null;
-    const maxMonths = Math.min(
-      Math.ceil((results.totalSetup / results.ahorroMensualNeto) * 2),
-      24
-    );
-    const labels = Array.from({ length: maxMonths }, (_, i) => `${i + 1}`);
-    const cumulative = labels.map(
-      (_, i) => results.ahorroMensualNeto * (i + 1)
-    );
-    const setupLine = labels.map(() => results.totalSetup);
-    return {
-      labels,
-      datasets: [
-        {
-          label: 'Ahorro acumulado',
-          data: cumulative,
-          borderColor: green,
-          tension: 0.3,
-          pointRadius: 2,
-        },
-        {
-          label: 'Setup',
-          data: setupLine,
-          borderColor: red,
-          borderDash: [5, 5],
-          pointRadius: 0,
-        },
-      ],
-    };
-  }, [results.totalSetup, results.ahorroMensualNeto]);
-
-  // 6) Doughnut: Fee breakdown
-  const selectedItems = data.selectedAutomations
-    .map((id) => AUTOMATIONS_CATALOG.find((a) => a.id === id)!)
-    .filter(Boolean);
-  const doughnutColors = [
-    'rgba(59, 130, 246, 0.8)',
-    'rgba(168, 85, 247, 0.8)',
-    'rgba(34, 197, 94, 0.8)',
-    'rgba(251, 191, 36, 0.8)',
-    'rgba(239, 68, 68, 0.8)',
-  ];
-  const breakdownChartData =
-    selectedItems.length > 0
-      ? {
-          labels: selectedItems.map((a) => a.nombre),
-          datasets: [
-            {
-              data: selectedItems.map(
-                (a) => results.allocationPrices[a.id] || 0
-              ),
-              backgroundColor: doughnutColors.slice(0, selectedItems.length),
-            },
-          ],
-        }
-      : null;
-
+  /* ── Charts ── */
   const barOpts = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: { y: { beginAtZero: true } },
   };
-
   const lineOpts = {
     responsive: true,
     maintainAspectRatio: false,
@@ -207,145 +109,140 @@ const ResultadosSection = ({ results, data }: Props) => {
     scales: { y: { beginAtZero: true } },
   };
 
+  // 1) Cost comparison
+  const costChartData = {
+    labels: ['Coste actual (€/mes)', 'Coste automatizado (€/mes)'],
+    datasets: [{
+      data: [results.costoActual, results.costoTrasAutomatizacion],
+      backgroundColor: [LOSS, PREMIUM],
+      borderRadius: 6,
+    }],
+  };
+
+  // 2) Cumulative savings
+  const months = Array.from({ length: 12 }, (_, i) => `Mes ${i + 1}`);
+  const cumSavings = months.map((_, i) => results.ahorroMensualNeto * (i + 1));
+  const savingsChartData = {
+    labels: months,
+    datasets: [{
+      label: 'Ahorro acumulado (€)',
+      data: cumSavings,
+      borderColor: POSITIVE,
+      backgroundColor: 'rgba(46,158,111,0.12)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+    }],
+  };
+
+  // 3) ROI bar
+  const roiChartData = {
+    labels: ['ROI (%)'],
+    datasets: [{
+      data: [Math.max(0, results.roi)],
+      backgroundColor: [POSITIVE],
+      borderRadius: 6,
+    }],
+  };
+
+  // 4) Breakdown (blue shades only)
+  const selectedItems = data.selectedAutomations
+    .map((id) => AUTOMATIONS_CATALOG.find((a) => a.id === id)!)
+    .filter(Boolean);
+
+  const blueShades = [
+    'rgba(30,58,138,0.9)',
+    'rgba(30,58,138,0.7)',
+    'rgba(30,58,138,0.5)',
+    'rgba(30,58,138,0.35)',
+    'rgba(30,58,138,0.2)',
+  ];
+
+  const breakdownChartData = selectedItems.length > 0
+    ? {
+        labels: selectedItems.map((a) => a.nombre),
+        datasets: [{
+          data: selectedItems.map((a) => results.allocationPrices[a.id] || 0),
+          backgroundColor: blueShades.slice(0, selectedItems.length),
+        }],
+      }
+    : null;
+
   return (
-    <div className="space-y-5">
-      {/* KPI grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPI
-          label="Horas perdidas/mes"
-          value={formatNumber(results.horasPerdidasMes)}
-        />
-        <KPI
-          label="Coste actual (€/mes)"
-          value={formatCurrency(results.costoActual)}
-        />
-        <KPI
-          label="Coste tras automatización"
-          value={formatCurrency(results.costoTrasAutomatizacion)}
-        />
-        <KPI
-          label="Ahorro mensual neto"
-          value={formatCurrency(results.ahorroMensualNeto)}
-          sub={formatPercent(results.ahorroPorcentaje)}
-          accent
-        />
-        <KPI
-          label="Ahorro anual neto"
-          value={formatCurrency(results.ahorroAnualNeto)}
-          accent
-        />
-        <KPI label="ROI" value={formatPercent(results.roi)} accent />
-        <KPI label="Payback" value={paybackText} />
-        <KPI
-          label="Fee mensual final"
-          value={formatCurrency(results.feeFinal)}
-          sub={`Rango: ${rangoText}`}
-        />
-        {results.totalSetup > 0 && (
-          <KPI
-            label="Setup total"
-            value={formatCurrency(results.totalSetup)}
-          />
-        )}
-        <KPI
-          label="Inversión 1er año"
-          value={formatCurrency(results.totalFirstYear)}
-          accent
-        />
+    <div className="space-y-6">
+      {/* ── SECTION 1: CURRENT COST (LOSS) ── */}
+      <div>
+        <SectionLabel>Coste actual</SectionLabel>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Metric label="Horas perdidas/mes" value={formatNumber(results.horasPerdidasMes)} color={LOSS} borderColor={LOSS} />
+          <Metric label="Coste actual (€/mes)" value={formatCurrency(results.costoActual)} color={LOSS} borderColor={LOSS} />
+          <Metric label="Pérdida total mensual" value={formatCurrency(results.costoActual)} color={LOSS} borderColor={LOSS} size="md" />
+        </div>
       </div>
 
-      {/* Charts */}
+      {/* ── SECTION 2: AUTOMATION IMPACT (POSITIVE) ── */}
+      <div>
+        <SectionLabel>Impacto de la automatización</SectionLabel>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Metric label="Ahorro mensual neto" value={formatCurrency(results.ahorroMensualNeto)} sub={formatPercent(results.ahorroPorcentaje)} color={POSITIVE} bg={POSITIVE_BG} />
+          <Metric label="Ahorro anual neto" value={formatCurrency(results.ahorroAnualNeto)} color={POSITIVE} bg={POSITIVE_BG} size="lg" />
+          <Metric label="ROI" value={formatPercent(results.roi)} color={POSITIVE} bg={POSITIVE_BG} size="md" />
+        </div>
+      </div>
+
+      {/* ── SECTION 3: INVESTMENT (PREMIUM) ── */}
+      <div>
+        <SectionLabel>Inversión</SectionLabel>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Metric label="Fee mensual final" value={formatCurrency(results.feeFinal)} sub={`Rango: ${formatCurrency(results.rangoMin)} – ${formatCurrency(results.rangoMax)}`} color={PREMIUM} bg={PREMIUM_BG} size="lg" />
+          <Metric label="Total setup" value={formatCurrency(results.totalSetup)} color={PREMIUM} bg={PREMIUM_BG} />
+          <Metric label="Inversión primer año" value={formatCurrency(results.totalFirstYear)} color={PREMIUM} bg={PREMIUM_BG} />
+        </div>
+      </div>
+
+      {/* ── SECTION 4: PAYBACK (CLOSING) ── */}
+      <div className="flex justify-center">
+        <div
+          className="rounded-lg border p-6 shadow-sm text-center w-full max-w-md"
+          style={{ backgroundColor: results.ahorroMensualNeto > 0 ? POSITIVE_BG : 'white' }}
+        >
+          <p className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: LABEL }}>Payback</p>
+          <p className="text-3xl font-bold" style={{ color: paybackColor }}>{paybackText}</p>
+        </div>
+      </div>
+
+      {/* ── CHARTS ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 1) Cost comparison */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">
-              Horas actuales vs post-automatización
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-56">
-            <Bar data={hoursChartData} options={barOpts} />
-          </CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Coste actual vs coste automatizado</CardTitle></CardHeader>
+          <CardContent className="h-56"><Bar data={costChartData} options={barOpts} /></CardContent>
         </Card>
 
+        {/* 2) Cumulative savings */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">
-              Coste actual vs coste automatizado
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-56">
-            <Bar data={costChartData} options={barOpts} />
-          </CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Ahorro acumulado (12 meses)</CardTitle></CardHeader>
+          <CardContent className="h-56"><Line data={savingsChartData} options={lineOpts} /></CardContent>
         </Card>
 
+        {/* 3) ROI */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">
-              Ahorro acumulado (12 meses)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-56">
-            <Line data={savingsChartData} options={lineOpts} />
-          </CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">ROI (%)</CardTitle></CardHeader>
+          <CardContent className="h-56"><Bar data={roiChartData} options={barOpts} /></CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">ROI (%)</CardTitle>
-          </CardHeader>
-          <CardContent className="h-56">
-            <Bar data={roiChartData} options={barOpts} />
-          </CardContent>
-        </Card>
-
-        {paybackChartData ? (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Payback timeline</CardTitle>
-            </CardHeader>
-            <CardContent className="h-56">
-              <Line data={paybackChartData} options={lineOpts} />
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Payback timeline</CardTitle>
-            </CardHeader>
-            <CardContent className="h-56 flex items-center justify-center text-sm text-muted-foreground">
-              {results.totalSetup <= 0
-                ? 'Sin coste de setup – payback inmediato'
-                : 'Ahorro insuficiente para recuperar setup'}
-            </CardContent>
-          </Card>
-        )}
-
+        {/* 4) Breakdown */}
         {breakdownChartData ? (
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">
-                Distribución del fee por automatización
-              </CardTitle>
-            </CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Distribución del fee por automatización</CardTitle></CardHeader>
             <CardContent className="h-56">
-              <Doughnut
-                data={breakdownChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { position: 'bottom' } },
-                }}
-              />
+              <Doughnut data={breakdownChartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} />
             </CardContent>
           </Card>
         ) : (
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">
-                Distribución del fee
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="h-56 flex items-center justify-center text-sm text-muted-foreground">
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Distribución del fee</CardTitle></CardHeader>
+            <CardContent className="h-56 flex items-center justify-center text-sm" style={{ color: LABEL }}>
               Selecciona automatizaciones en la pestaña correspondiente
             </CardContent>
           </Card>
