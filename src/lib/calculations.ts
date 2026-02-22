@@ -197,14 +197,14 @@ export const EXAMPLE_DATA: Partial<FormData> = {
 export function getEffectiveMonthly(data: FormData, id: string): number {
   const item = AUTOMATIONS_CATALOG.find((a) => a.id === id);
   if (!item) return 0;
-  const override = data.automationOverrides[id];
+  const override = data.automationOverrides?.[id];
   return override ? Math.max(override.monthlyPrice, item.minMonthly) : item.minMonthly;
 }
 
 export function getEffectiveSetup(data: FormData, id: string): number {
   const item = AUTOMATIONS_CATALOG.find((a) => a.id === id);
   if (!item) return 0;
-  const override = data.automationOverrides[id];
+  const override = data.automationOverrides?.[id];
   return override ? Math.max(override.setupFee, item.defaultSetup) : item.defaultSetup;
 }
 
