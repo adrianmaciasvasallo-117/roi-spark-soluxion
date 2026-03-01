@@ -46,18 +46,25 @@ const DatosSection = ({
   const numInput = (
     key: keyof FormData,
     opts?: { step?: string; min?: string; max?: string; placeholder?: string }
-  ) => (
-    <Input
-      type="number"
-      value={data[key] as number}
-      onChange={(e) => update(key, Number(e.target.value) as never)}
-      step={opts?.step}
-      min={opts?.min}
-      max={opts?.max}
-      placeholder={opts?.placeholder}
-      className="h-9"
-    />
-  );
+  ) => {
+    const raw = data[key] as number;
+    const display = raw === 0 ? '' : String(raw);
+    return (
+      <Input
+        type="number"
+        value={display}
+        onChange={(e) => {
+          const v = e.target.value;
+          update(key, (v === '' ? 0 : Number(v)) as never);
+        }}
+        step={opts?.step}
+        min={opts?.min}
+        max={opts?.max}
+        placeholder={opts?.placeholder ?? '0'}
+        className="h-9"
+      />
+    );
+  };
 
   return (
     <div className="space-y-5 overflow-x-hidden">
