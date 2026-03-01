@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,12 +16,14 @@ serve(async (req) => {
     if (!RESEND_API_KEY) {
       console.error('[send-email] RESEND_API_KEY not configured');
       return new Response(
-        JSON.stringify({ error: 'RESEND_API_KEY no configurada. Contacta con el administrador.' }),
+        JSON.stringify({ error: 'RESEND_API_KEY no configurada.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'onboarding@resend.dev';
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     let payload: any;
     try {
@@ -32,16 +35,43 @@ serve(async (req) => {
       );
     }
 
-    const { to, subject, body, pdfBase64, fileName } = payload;
+    const { to, subject, body, storagePath, fileName } = payload;
 
-    if (!to || !subject || !pdfBase64) {
+    if (!to || !subject || !storagePath) {
       return new Response(
-        JSON.stringify({ error: 'Faltan campos obligatorios: to, subject, pdfBase64' }),
+        JSON.stringify({ error: 'Faltan campos obligatorios: to, subject, storagePath' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[send-email] Sending to: ${to}, subject: ${subject}, attachment size: ${pdfBase64.length} chars`);
+    console.log(`[send-email] Sending to: ${to}, file: ${storagePath}`);
+
+    // Download PDF from storage using service role
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('proposals')
+      .download(storagePath);
+
+    if (downloadError || !fileData) {
+      console.error('[send-email] Storage download error:', downloadError);
+      return new Response(
+        JSON.stringify({ error: 'No se pudo descargar el PDF del almacenamiento.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Convert to base64
+    const arrayBuffer = await fileData.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    const chunkSize = 32768;
+    const chunks: string[] = [];
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      chunks.push(String.fromCharCode(...chunk));
+    }
+    const pdfBase64 = btoa(chunks.join(''));
+
+    console.log(`[send-email] PDF size: ${bytes.length} bytes, base64: ${pdfBase64.length} chars`);
 
     const emailPayload: any = {
       from: FROM_EMAIL,
@@ -68,6 +98,9 @@ serve(async (req) => {
     });
 
     const result = await response.json();
+
+    // Clean up the uploaded file
+    await supabase.storage.from('proposals').remove([storagePath]).catch(() => {});
 
     if (!response.ok) {
       console.error('[send-email] Resend API error:', JSON.stringify(result));
