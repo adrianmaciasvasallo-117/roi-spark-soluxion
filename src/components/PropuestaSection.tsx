@@ -147,21 +147,32 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
     setErrorDetail('');
 
     try {
-      console.log('[EMAIL] Converting PDF to base64…');
-      const pdfBase64 = await blobToBase64(pdfBlob);
-      console.log('[EMAIL] Base64 length:', pdfBase64.length);
+      // Upload PDF to storage instead of sending base64 in the request
+      const storagePath = `${Date.now()}_${getFileName()}`;
+      console.log('[EMAIL] Uploading PDF to storage…', storagePath);
 
-      const fileName = getFileName();
+      const { error: uploadError } = await supabase.storage
+        .from('proposals')
+        .upload(storagePath, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error('[EMAIL] Storage upload error:', uploadError);
+        throw new Error('No se pudo subir el PDF. Intenta de nuevo.');
+      }
+
       const recipient = data.emailCliente.trim();
-
       console.log('[EMAIL] Sending email to:', recipient);
+
       const { data: responseData, error } = await supabase.functions.invoke('send-email', {
         body: {
           to: recipient,
           subject: data.asuntoEmail || `Propuesta de Automatización - ${data.empresa || 'Cliente'}`,
           body: data.mensajeEmail || '',
-          pdfBase64,
-          fileName,
+          storagePath,
+          fileName: getFileName(),
         },
       });
 
