@@ -99,8 +99,8 @@ const DatosSection = ({
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div className="space-y-1">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 min-w-0">
+            <div className="space-y-1 min-w-0">
               <Label className="text-xs">Email del cliente</Label>
               <Input
                 type="email"
@@ -110,13 +110,13 @@ const DatosSection = ({
                 className="h-9 w-full max-w-full"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <Label className="text-xs">Fecha de elaboración</Label>
               <Input
                 type="date"
                 value={data.fechaElaboracion}
                 onChange={(e) => update('fechaElaboracion', e.target.value)}
-                className="h-9 w-full max-w-full box-border"
+                className="h-9 w-full max-w-full box-border min-w-0"
               />
             </div>
           </div>
