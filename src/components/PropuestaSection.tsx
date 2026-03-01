@@ -3,9 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FormData, Results } from '@/lib/calculations';
 import { generatePDF } from '@/lib/pdfGenerator';
-import { FileText, Send, RotateCcw, Loader2 } from 'lucide-react';
+import { FileText, Send, RotateCcw, Loader2, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 interface Props {
   data: FormData;
@@ -19,10 +26,12 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sendError, setSendError] = useState(false);
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const getFileName = () =>
-    `Propuesta_Soluxion_${data.empresa.replace(/\s+/g, '_')}_${data.fechaElaboracion}.pdf`;
+    `Propuesta_Soluxion_${(data.empresa || 'Empresa').replace(/\s+/g, '_')}_${data.fechaElaboracion || 'sin_fecha'}.pdf`;
 
   const validate = (): string | null => {
     if (!data.empresa.trim()) return 'El campo "Empresa" es obligatorio.';
@@ -36,14 +45,23 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
   };
 
   const triggerDownload = (blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = getFileName();
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    try {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = getFileName();
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.error('[PDF] Error triggering download:', err);
+      toast({
+        title: 'Error',
+        description: 'No se pudo descargar el PDF.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleGenerate = async () => {
@@ -53,26 +71,33 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
       return;
     }
     setGenerating(true);
+    setSendError(false);
     try {
+      console.log('[PDF] Generating PDF…');
       const blob = await generatePDF(data, results);
+      if (!blob || blob.size === 0) {
+        throw new Error('El PDF generado está vacío.');
+      }
+      console.log('[PDF] PDF generated successfully. Size:', blob.size, 'bytes');
       setPdfBlob(blob);
       setGenerated(true);
       triggerDownload(blob);
       toast({ title: 'PDF generado y descargado correctamente' });
-    } catch (e) {
+    } catch (e: any) {
+      console.error('[PDF] Generation error:', e);
       toast({
         title: 'Error',
-        description: 'No se pudo generar el PDF.',
+        description: e?.message || 'No se pudo generar el PDF.',
         variant: 'destructive',
       });
-      console.error(e);
     } finally {
       setGenerating(false);
     }
   };
 
   const handleSend = async () => {
-    if (!pdfBlob) {
+    // Pre-flight validation
+    if (!pdfBlob || pdfBlob.size === 0) {
       toast({
         title: 'PDF necesario',
         description: 'Genera el PDF antes de enviarlo.',
@@ -80,6 +105,16 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
       });
       return;
     }
+
+    if (!data.emailCliente.trim() || !data.emailCliente.includes('@')) {
+      toast({
+        title: 'Email inválido',
+        description: 'Introduce un email válido antes de enviar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!data.rgpdChecked) {
       toast({
         title: 'RGPD',
@@ -90,58 +125,105 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
     }
 
     setSending(true);
+    setSendError(false);
+
     try {
-      // Convert blob to base64
+      console.log('[EMAIL] Converting PDF to base64…');
       const arrayBuffer = await pdfBlob.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
       let binary = '';
-      bytes.forEach((b) => (binary += String.fromCharCode(b)));
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
       const pdfBase64 = btoa(binary);
+      console.log('[EMAIL] Base64 length:', pdfBase64.length);
 
-      const fileName = `Propuesta_Soluxion_${data.empresa.replace(/\s+/g, '_')}_${data.fechaElaboracion}.pdf`;
+      const fileName = getFileName();
 
-      const { error } = await supabase.functions.invoke('send-email', {
+      console.log('[EMAIL] Sending email to:', data.emailCliente);
+      const { data: responseData, error } = await supabase.functions.invoke('send-email', {
         body: {
           to: data.emailCliente,
-          subject: data.asuntoEmail,
-          body: data.mensajeEmail,
+          subject: data.asuntoEmail || `Propuesta de Automatización - ${data.empresa}`,
+          body: data.mensajeEmail || '',
           pdfBase64,
           fileName,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[EMAIL] Supabase function error:', error);
+        throw new Error(
+          typeof error === 'object' && error.message
+            ? error.message
+            : 'Error al invocar la función de envío.'
+        );
+      }
 
+      // Check response for errors
+      if (responseData && responseData.error) {
+        console.error('[EMAIL] API returned error:', responseData.error);
+        throw new Error(responseData.error);
+      }
+
+      console.log('[EMAIL] Email sent successfully:', responseData);
       setSent(true);
-      toast({ title: '¡Email enviado!', description: `Propuesta enviada a ${data.emailCliente}` });
+      setSuccessDialogOpen(true);
+      toast({
+        title: '¡Email enviado!',
+        description: `Propuesta enviada a ${data.emailCliente}`,
+      });
     } catch (e: any) {
+      console.error('[EMAIL] Send failed:', e);
+      setSendError(true);
       toast({
         title: 'Error al enviar',
-        description: e?.message || 'No se pudo enviar el email. Verifica la configuración del backend.',
+        description:
+          e?.message ||
+          'No se pudo enviar el email. Verifique la conexión o configuración del servidor.',
         variant: 'destructive',
       });
-      console.error(e);
     } finally {
       setSending(false);
     }
   };
 
-  if (sent) {
+  if (sent && !sendError) {
     return (
-      <Card className="text-center py-12">
-        <CardContent className="space-y-4">
-          <div className="text-4xl">✅</div>
-          <h2 className="text-xl font-bold">¡Propuesta enviada!</h2>
-          <p className="text-sm text-muted-foreground">
-            Se ha enviado la propuesta a {data.emailCliente} con copia a
-            soluxion.ai@gmail.com
-          </p>
-          <Button onClick={onReset}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Nuevo cálculo
-          </Button>
-        </CardContent>
-      </Card>
+      <>
+        <Card className="text-center py-12">
+          <CardContent className="space-y-4">
+            <div className="text-4xl">✅</div>
+            <h2 className="text-xl font-bold">¡Propuesta enviada!</h2>
+            <p className="text-sm text-muted-foreground">
+              Se ha enviado la propuesta a {data.emailCliente} con copia a
+              soluxion.ai@gmail.com
+            </p>
+            <div className="flex gap-3 justify-center flex-wrap">
+              {pdfBlob && (
+                <Button variant="outline" onClick={() => triggerDownload(pdfBlob)}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Descargar PDF
+                </Button>
+              )}
+              <Button onClick={onReset}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Nuevo cálculo
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Propuesta enviada correctamente</DialogTitle>
+              <DialogDescription>
+                La propuesta ha sido enviada a: <strong>{data.emailCliente}</strong>
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
 
@@ -178,8 +260,21 @@ const PropuestaSection = ({ data, results, onReset }: Props) => {
           {generated && pdfBlob && (
             <div className="flex gap-3 flex-wrap items-center mt-2">
               <Button variant="outline" size="sm" onClick={() => triggerDownload(pdfBlob)}>
-                <FileText className="h-4 w-4 mr-2" />
+                <Download className="h-4 w-4 mr-2" />
                 Descargar PDF de nuevo
+              </Button>
+            </div>
+          )}
+
+          {/* Fallback when send fails */}
+          {sendError && pdfBlob && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 space-y-2">
+              <p className="text-sm font-medium text-destructive">
+                No se pudo enviar el email. Puedes descargar el PDF manualmente:
+              </p>
+              <Button variant="outline" size="sm" onClick={() => triggerDownload(pdfBlob)}>
+                <Download className="h-4 w-4 mr-2" />
+                Descargar PDF manualmente
               </Button>
             </div>
           )}
