@@ -126,14 +126,19 @@ const AutomatizacionesSection = ({ data, onChange, results }: Props) => {
                             type="number"
                             min={item.minMonthly}
                             step={50}
-                            value={override?.monthlyPrice ?? item.minMonthly}
+                            value={
+                              (override?.monthlyPrice ?? item.minMonthly) === 0
+                                ? ''
+                                : String(override?.monthlyPrice ?? item.minMonthly)
+                            }
                             onChange={(e) =>
                               updateOverride(
                                 item.id,
                                 'monthlyPrice',
-                                Number(e.target.value)
+                                e.target.value === '' ? 0 : Number(e.target.value)
                               )
                             }
+                            placeholder="0"
                             className="h-8 text-sm"
                           />
                           <span className="text-[10px] text-muted-foreground">
@@ -148,14 +153,19 @@ const AutomatizacionesSection = ({ data, onChange, results }: Props) => {
                             type="number"
                             min={item.defaultSetup}
                             step={100}
-                            value={override?.setupFee ?? item.defaultSetup}
+                            value={
+                              (override?.setupFee ?? item.defaultSetup) === 0
+                                ? ''
+                                : String(override?.setupFee ?? item.defaultSetup)
+                            }
                             onChange={(e) =>
                               updateOverride(
                                 item.id,
                                 'setupFee',
-                                Number(e.target.value)
+                                e.target.value === '' ? 0 : Number(e.target.value)
                               )
                             }
+                            placeholder="0"
                             className="h-8 text-sm"
                           />
                           {item.defaultSetup > 0 && (

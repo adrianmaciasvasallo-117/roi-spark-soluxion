@@ -67,3 +67,11 @@
     @apply bg-card rounded-lg border p-4 shadow-sm;
   }
 }
+
+/* Normalize date inputs on Safari/iOS to match other inputs */
+input[type="date"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  min-width: 0 !important;
+}
