@@ -51,13 +51,16 @@ function renderChartToImage(
   logicalW = 500,
   logicalH = 250
 ): string {
-  const ratio = 3;
+  const ratio = 2; // reduced from 3 to keep file size manageable
   const canvas = document.createElement('canvas');
   canvas.width = logicalW * ratio;
   canvas.height = logicalH * ratio;
   canvas.style.width = `${logicalW}px`;
   canvas.style.height = `${logicalH}px`;
   const ctx = canvas.getContext('2d')!;
+  // Fill white background (needed for JPEG)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.scale(ratio, ratio);
   const chart = new ChartJS(ctx, {
     type,
@@ -69,7 +72,7 @@ function renderChartToImage(
       devicePixelRatio: ratio,
     },
   });
-  const image = canvas.toDataURL('image/png', 1.0);
+  const image = canvas.toDataURL('image/jpeg', 0.85);
   chart.destroy();
   return image;
 }
@@ -387,7 +390,7 @@ export async function generatePDF(data: FormData, results: Results): Promise<Blo
     plugins: { legend: { display: false }, title: { display: true, text: 'Coste mensual: actual vs automatizado', font: { size: 13 } } },
     scales: { y: { beginAtZero: true } },
   }, 600, 280);
-  doc.addImage(costImg, 'PNG', MARGIN, y, CONTENT_W, 55);
+  doc.addImage(costImg, 'JPEG', MARGIN, y, CONTENT_W, 55);
   y += 60;
 
   // Chart 2: Cumulative savings
@@ -409,7 +412,7 @@ export async function generatePDF(data: FormData, results: Results): Promise<Blo
     plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Ahorro acumulado (12 meses)', font: { size: 13 } } },
     scales: { y: { beginAtZero: true } },
   }, 600, 280);
-  doc.addImage(savingsImg, 'PNG', MARGIN, y, CONTENT_W, 55);
+  doc.addImage(savingsImg, 'JPEG', MARGIN, y, CONTENT_W, 55);
   y += 60;
 
   // Chart 3: ROI
@@ -426,7 +429,7 @@ export async function generatePDF(data: FormData, results: Results): Promise<Blo
     plugins: { legend: { display: false }, title: { display: true, text: `ROI: ${formatPercent(results.roi)}`, font: { size: 13 } } },
     scales: { x: { beginAtZero: true } },
   }, 600, 180);
-  doc.addImage(savingsImg.length ? roiImg : roiImg, 'PNG', MARGIN, y, CONTENT_W, 35);
+  doc.addImage(roiImg, 'JPEG', MARGIN, y, CONTENT_W, 35);
   y += 40;
 
   // Chart 4: Fee breakdown
@@ -448,7 +451,7 @@ export async function generatePDF(data: FormData, results: Results): Promise<Blo
     }, {
       plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Distribución de servicios', font: { size: 13 } } },
     }, 450, 300);
-    doc.addImage(breakdownImg, 'PNG', MARGIN + 15, y, CONTENT_W - 30, 60);
+    doc.addImage(breakdownImg, 'JPEG', MARGIN + 15, y, CONTENT_W - 30, 60);
     y += 65;
   }
 
