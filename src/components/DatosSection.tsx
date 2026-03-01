@@ -60,9 +60,9 @@ const DatosSection = ({
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 overflow-x-hidden">
       {/* Action buttons */}
-      <div className="flex gap-2 justify-end">
+      <div className="flex gap-2 justify-end flex-wrap">
         <Button variant="outline" size="sm" onClick={onFillExample}>
           <Sparkles className="h-3.5 w-3.5 mr-1" />
           Rellenar ejemplo
@@ -78,45 +78,49 @@ const DatosSection = ({
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Identificación</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Empresa</Label>
-            <Input
-              value={data.empresa}
-              onChange={(e) => update('empresa', e.target.value)}
-              placeholder="Nombre de la empresa"
-              className="h-9"
-            />
+        <CardContent className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Empresa</Label>
+              <Input
+                value={data.empresa}
+                onChange={(e) => update('empresa', e.target.value)}
+                placeholder="Nombre de la empresa"
+                className="h-9 w-full max-w-full"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Nombre del cliente</Label>
+              <Input
+                value={data.nombreCliente}
+                onChange={(e) => update('nombreCliente', e.target.value)}
+                placeholder="Nombre completo"
+                className="h-9 w-full max-w-full"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Email del cliente</Label>
+              <Input
+                type="email"
+                value={data.emailCliente}
+                onChange={(e) => update('emailCliente', e.target.value)}
+                placeholder="cliente@empresa.es"
+                className="h-9 w-full max-w-full"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Fecha de elaboración</Label>
+              <Input
+                type="date"
+                value={data.fechaElaboracion}
+                onChange={(e) => update('fechaElaboracion', e.target.value)}
+                className="h-9 w-full max-w-full box-border"
+              />
+            </div>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Nombre del cliente</Label>
-            <Input
-              value={data.nombreCliente}
-              onChange={(e) => update('nombreCliente', e.target.value)}
-              placeholder="Nombre completo"
-              className="h-9"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Email del cliente</Label>
-            <Input
-              type="email"
-              value={data.emailCliente}
-              onChange={(e) => update('emailCliente', e.target.value)}
-              placeholder="cliente@empresa.es"
-              className="h-9"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Fecha de elaboración</Label>
-            <Input
-              type="date"
-              value={data.fechaElaboracion}
-              onChange={(e) => update('fechaElaboracion', e.target.value)}
-              className="h-9"
-            />
-          </div>
-          <div className="space-y-1 md:col-span-2">
             <Label className="text-xs">Asunto del email</Label>
             <Input
               value={data.asuntoEmail}
@@ -124,7 +128,7 @@ const DatosSection = ({
               className="h-9"
             />
           </div>
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1">
             <Label className="text-xs">Mensaje del email</Label>
             <Textarea
               value={data.mensajeEmail}
@@ -133,7 +137,7 @@ const DatosSection = ({
               className="text-sm"
             />
           </div>
-          <div className="flex items-start gap-2 md:col-span-2">
+          <div className="flex items-start gap-2">
             <Checkbox
               id="rgpd"
               checked={data.rgpdChecked}
@@ -153,7 +157,7 @@ const DatosSection = ({
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Parámetros generales</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Días laborables/mes</Label>
             {numInput('diasLaborablesMes')}
@@ -197,7 +201,7 @@ const DatosSection = ({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Nº empleados afectados</Label>
                 {numInput('numEmpleados')}
@@ -245,7 +249,7 @@ const DatosSection = ({
             </div>
           )}
           <Separator />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Salario mensual medio (€/mes)</Label>
               {numInput('salarioMensual')}
@@ -267,7 +271,7 @@ const DatosSection = ({
             2. Oportunidades y Dinero Perdido
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Leads perdidos/mes</Label>
             {numInput('leadsPerdidos')}
@@ -290,7 +294,7 @@ const DatosSection = ({
             3. Costos Operativos Evitables
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">
               Salario mensual recurso sustituible (€/mes)
@@ -312,7 +316,7 @@ const DatosSection = ({
           <CardTitle className="text-base">Pricing (tu fee)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">% a cobrar sobre ahorro anual</Label>
               <Select
@@ -340,7 +344,7 @@ const DatosSection = ({
             </div>
           </div>
           <Separator />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs">Fee mensual sugerido</Label>
               <div className="h-9 px-3 flex items-center bg-muted rounded-md text-sm font-medium">
