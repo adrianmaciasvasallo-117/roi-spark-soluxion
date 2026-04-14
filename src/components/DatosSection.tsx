@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -9,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -27,7 +25,6 @@ interface Props {
   onClear: () => void;
   derivedTarifaHora: number;
   derivedFeeSugerido: number;
-  derivedMinTotal: number;
 }
 
 const DatosSection = ({
@@ -37,7 +34,6 @@ const DatosSection = ({
   onClear,
   derivedTarifaHora,
   derivedFeeSugerido,
-  derivedMinTotal,
 }: Props) => {
   const update = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     onChange({ ...data, [key]: value });
@@ -127,56 +123,6 @@ const DatosSection = ({
               />
             </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Asunto del email</Label>
-            <Input
-              value={data.asuntoEmail}
-              onChange={(e) => update('asuntoEmail', e.target.value)}
-              className="h-9"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Mensaje del email</Label>
-            <Textarea
-              value={data.mensajeEmail}
-              onChange={(e) => update('mensajeEmail', e.target.value)}
-              rows={3}
-              className="text-sm"
-            />
-          </div>
-          <div className="flex items-start gap-2">
-            <Checkbox
-              id="rgpd"
-              checked={data.rgpdChecked}
-              onCheckedChange={(v) => update('rgpdChecked', !!v)}
-              className="mt-0.5"
-            />
-            <Label htmlFor="rgpd" className="text-xs leading-relaxed">
-              Acepto el tratamiento de datos para recibir la propuesta por
-              email.
-            </Label>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* B) Parámetros generales */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Parámetros generales</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Días laborables/mes</Label>
-            {numInput('diasLaborablesMes')}
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Horas laborables/mes</Label>
-            {numInput('horasLaborablesMes')}
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Días laborables/semana</Label>
-            {numInput('diasLaborablesSemana')}
-          </div>
         </CardContent>
       </Card>
 
@@ -186,20 +132,34 @@ const DatosSection = ({
           <CardTitle className="text-base">
             1. Análisis de Pérdida de Tiempo
           </CardTitle>
-          <div className="flex items-center gap-2 mt-1">
-            <Label className="text-xs text-muted-foreground">
-              Detalle por tareas
-            </Label>
-            <Switch
-              checked={data.modoRapido}
-              onCheckedChange={(v) => update('modoRapido', v)}
-            />
-            <Label className="text-xs text-muted-foreground">
-              Introducción rápida
-            </Label>
-          </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Mode toggle pills */}
+          <div className="flex gap-2 mb-3">
+            <button
+              type="button"
+              onClick={() => update('modoRapido', false)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                !data.modoRapido
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-muted-foreground border-border hover:border-primary/50'
+              }`}
+            >
+              Modo detalle
+            </button>
+            <button
+              type="button"
+              onClick={() => update('modoRapido', true)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                data.modoRapido
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-muted-foreground border-border hover:border-primary/50'
+              }`}
+            >
+              Modo rápido
+            </button>
+          </div>
+
           {data.modoRapido ? (
             <div className="grid grid-cols-1 gap-3">
               <div className="space-y-1">
@@ -256,10 +216,15 @@ const DatosSection = ({
             </div>
           )}
           <Separator />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Salario mensual medio (€/mes)</Label>
               {numInput('salarioMensual')}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Horas laborables/mes</Label>
+              <p className="text-[10px] text-muted-foreground">Determina la tarifa €/hora</p>
+              {numInput('horasLaborablesMes')}
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Tarifa por hora (derivada)</Label>
@@ -343,27 +308,14 @@ const DatosSection = ({
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">
-                Coste de puesta en marcha (€){' '}
-                <span className="text-muted-foreground">(opcional)</span>
-              </Label>
-              {numInput('costeSetup')}
-            </div>
-          </div>
-          <Separator />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-end">
-            <div className="space-y-1">
               <Label className="text-xs">Fee mensual sugerido</Label>
               <div className="h-9 px-3 flex items-center bg-muted rounded-md text-sm font-medium">
                 {formatCurrencyDecimals(derivedFeeSugerido)}
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Mínimo total (automatizaciones)</Label>
-              <div className="h-9 px-3 flex items-center bg-muted rounded-md text-sm font-medium">
-                {formatCurrencyDecimals(derivedMinTotal)}
-              </div>
-            </div>
+          </div>
+          <Separator />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-end">
             <div className="space-y-1">
               <div className="flex items-center gap-2 mb-1">
                 <Switch
