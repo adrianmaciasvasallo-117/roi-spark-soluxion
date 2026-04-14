@@ -331,7 +331,7 @@ export async function generatePDF(data: FormData, results: Results): Promise<Blo
 
   const rangoText = `${formatCurrency(results.rangoMin)} – ${formatCurrency(results.rangoMax)}`;
   const totalBody: [string, string][] = [
-    ['Fee mensual final', formatCurrency(results.feeFinal)],
+    ['Fee mensual final (base imponible)', formatCurrency(results.feeFinal)],
     ['Rango sugerido mensual', rangoText],
   ];
   if (results.totalSetup > 0) {
@@ -344,6 +344,33 @@ export async function generatePDF(data: FormData, results: Results): Promise<Blo
     body: totalBody,
     theme: 'plain',
     styles: { fontSize: 10, cellPadding: 3.5 },
+    bodyStyles: { textColor: COLOR.neutral },
+    columnStyles: { 1: { textColor: COLOR.investment, fontStyle: 'bold' } },
+    margin: { left: MARGIN, right: MARGIN },
+  });
+  y = (doc as any).lastAutoTable.finalY + 6;
+
+  // Fiscal breakdown
+  const fiscalBody: [string, string][] = [
+    ['Base imponible', formatCurrency(results.baseImponible)],
+  ];
+  if (data.ivaEnabled) {
+    fiscalBody.push([`IVA (${data.ivaPorcentaje}%)`, `+${formatCurrency(results.ivaAmount)}`]);
+  }
+  if (data.irpfEnabled) {
+    fiscalBody.push([`Retención IRPF (${data.irpfPorcentaje}%)`, `−${formatCurrency(results.irpfAmount)}`]);
+  }
+  fiscalBody.push(['Total mensual con impuestos', formatCurrency(results.totalConImpuestos)]);
+  fiscalBody.push(['Total anual con impuestos', formatCurrency(results.totalAnualConImpuestos)]);
+
+  y = addPageIfNeeded(doc, y, 40);
+  autoTable(doc, {
+    startY: y,
+    head: [['Concepto fiscal', 'Importe']],
+    body: fiscalBody,
+    theme: 'grid',
+    headStyles: { fillColor: COLOR.investment, textColor: COLOR.white, fontStyle: 'bold' },
+    styles: { fontSize: 9, cellPadding: 3.5 },
     bodyStyles: { textColor: COLOR.neutral },
     columnStyles: { 1: { textColor: COLOR.investment, fontStyle: 'bold' } },
     margin: { left: MARGIN, right: MARGIN },
