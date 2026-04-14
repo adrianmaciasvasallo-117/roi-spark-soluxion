@@ -86,14 +86,6 @@ const AutomatizacionesSection = ({ data, onChange, results }: Props) => {
                       onClick={() => toggleAutomation(item.id)}
                     >
                       <h3 className="text-sm font-semibold">{item.nombre}</h3>
-                      <Badge variant="secondary" className="text-xs">
-                        Mín. {formatCurrency(item.minMonthly)}/mes
-                      </Badge>
-                      {item.defaultSetup > 0 && (
-                        <Badge variant="outline" className="text-xs">
-                          Setup {formatCurrency(item.defaultSetup)}
-                        </Badge>
-                      )}
                     </div>
                     <p
                       className="text-xs text-muted-foreground mb-2 cursor-pointer"
