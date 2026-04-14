@@ -130,7 +130,7 @@ const ResultadosSection = ({ results, data }: Props) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Metric label="Horas perdidas/mes" value={formatNumber(results.horasPerdidasMes)} color={LOSS} borderColor={LOSS} />
           <Metric label="Coste de tiempo/mes" value={formatCurrency(results.costoTiempo)} color={LOSS} borderColor={LOSS} />
-          <Metric label="Coste actual total/mes" value={formatCurrency(results.costoActual)} color={LOSS} borderColor={LOSS} size="md" />
+          <Metric label="Coste actual total/año" value={formatCurrency(results.costoActual * 12)} color={LOSS} borderColor={LOSS} size="md" />
         </div>
       </div>
 
