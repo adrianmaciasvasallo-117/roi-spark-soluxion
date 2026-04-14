@@ -307,7 +307,6 @@ export function calculateResults(data: FormData): Results {
     allocationPrices[id] = getEffectiveMonthly(data, id);
   });
 
-  }
 
   // Fee final
   let feeFinal: number;
