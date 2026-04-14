@@ -3,6 +3,7 @@ import {
   FormData,
   AUTOMATIONS_CATALOG,
   formatCurrency,
+  formatCurrencyDecimals,
   formatNumber,
   formatPercent,
 } from '@/lib/calculations';
@@ -144,10 +145,11 @@ const ResultadosSection = ({ results, data }: Props) => {
 
       <div>
         <SectionLabel>Inversión</SectionLabel>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Metric label="Fee mensual final" value={formatCurrency(results.feeFinal)} sub={`Rango: ${formatCurrency(results.rangoMin)} – ${formatCurrency(results.rangoMax)}`} color={PREMIUM} bg={PREMIUM_BG} size="lg" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Metric label="Fee mensual final" value={formatCurrency(results.feeFinal)} sub={`Con impuestos: ${formatCurrencyDecimals(results.totalConImpuestos)}`} color={PREMIUM} bg={PREMIUM_BG} size="lg" />
           <Metric label="Total setup" value={formatCurrency(results.totalSetup)} color={PREMIUM} bg={PREMIUM_BG} />
           <Metric label="Inversión primer año" value={formatCurrency(results.totalFirstYear)} color={PREMIUM} bg={PREMIUM_BG} />
+          <Metric label="Fee anual con impuestos" value={formatCurrency(results.totalAnualConImpuestos)} color={PREMIUM} bg={PREMIUM_BG} />
         </div>
       </div>
 

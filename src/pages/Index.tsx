@@ -71,6 +71,7 @@ const Index = () => {
               onClear={handleClear}
               derivedTarifaHora={results.tarifaHora}
               derivedFeeSugerido={results.feeSugerido}
+              results={results}
             />
           </TabsContent>
 
