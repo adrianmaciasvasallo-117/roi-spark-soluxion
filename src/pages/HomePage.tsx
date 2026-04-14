@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import { Badge } from '@/components/ui/badge';
 import { useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 
 interface HistoryEntry {
   id: string;
