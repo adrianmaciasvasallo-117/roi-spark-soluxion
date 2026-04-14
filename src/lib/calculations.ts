@@ -171,6 +171,11 @@ export const DEFAULT_FORM_DATA: FormData = {
   feeMensualOverride: 0,
   autoDistributeRemainder: true,
 
+  ivaEnabled: true,
+  ivaPorcentaje: 21,
+  irpfEnabled: true,
+  irpfPorcentaje: 15,
+
   selectedAutomations: [],
   automationOverrides: {},
 };
@@ -243,6 +248,11 @@ export interface Results {
   allocationPrices: Record<string, number>;
   totalSetup: number;
   totalFirstYear: number;
+  baseImponible: number;
+  ivaAmount: number;
+  irpfAmount: number;
+  totalConImpuestos: number;
+  totalAnualConImpuestos: number;
 }
 
 export function calculateResults(data: FormData): Results {
@@ -359,6 +369,13 @@ export function calculateResults(data: FormData): Results {
   const rangoMin = (ahorroAnualBruto * 0.15) / 12;
   const rangoMax = (ahorroAnualBruto * 0.25) / 12;
 
+  // Fiscal
+  const baseImponible = feeFinal;
+  const ivaAmount = data.ivaEnabled ? (baseImponible * data.ivaPorcentaje) / 100 : 0;
+  const irpfAmount = data.irpfEnabled ? (baseImponible * data.irpfPorcentaje) / 100 : 0;
+  const totalConImpuestos = baseImponible + ivaAmount - irpfAmount;
+  const totalAnualConImpuestos = totalConImpuestos * 12;
+
   // Total first year
   const totalFirstYear = feeFinal * 12 + totalSetup;
 
@@ -388,6 +405,11 @@ export function calculateResults(data: FormData): Results {
     allocationPrices,
     totalSetup,
     totalFirstYear,
+    baseImponible,
+    ivaAmount,
+    irpfAmount,
+    totalConImpuestos,
+    totalAnualConImpuestos,
   };
 }
 
