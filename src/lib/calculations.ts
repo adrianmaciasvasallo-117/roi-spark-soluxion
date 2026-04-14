@@ -122,7 +122,7 @@ export interface FormData {
   costeSetup: number; // kept for legacy/override — totalSetup is now computed
   overrideEnabled: boolean;
   feeMensualOverride: number;
-  autoDistributeRemainder: boolean;
+  
 
   ivaEnabled: boolean;
   ivaPorcentaje: number;
