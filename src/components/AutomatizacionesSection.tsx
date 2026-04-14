@@ -124,7 +124,6 @@ const AutomatizacionesSection = ({ data, onChange, results }: Props) => {
                           </label>
                           <Input
                             type="number"
-                            min={item.minMonthly}
                             step={50}
                             value={
                               (override?.monthlyPrice ?? item.minMonthly) === 0
@@ -141,9 +140,6 @@ const AutomatizacionesSection = ({ data, onChange, results }: Props) => {
                             placeholder="0"
                             className="h-8 text-sm"
                           />
-                          <span className="text-[10px] text-muted-foreground">
-                            Mín. {formatCurrency(item.minMonthly)}
-                          </span>
                         </div>
                         <div className="flex-1">
                           <label className="text-xs text-muted-foreground block mb-1">
@@ -151,7 +147,6 @@ const AutomatizacionesSection = ({ data, onChange, results }: Props) => {
                           </label>
                           <Input
                             type="number"
-                            min={item.defaultSetup}
                             step={100}
                             value={
                               (override?.setupFee ?? item.defaultSetup) === 0
@@ -168,11 +163,6 @@ const AutomatizacionesSection = ({ data, onChange, results }: Props) => {
                             placeholder="0"
                             className="h-8 text-sm"
                           />
-                          {item.defaultSetup > 0 && (
-                            <span className="text-[10px] text-muted-foreground">
-                              Mín. {formatCurrency(item.defaultSetup)}
-                            </span>
-                          )}
                         </div>
                       </div>
                     )}

@@ -198,14 +198,14 @@ export function getEffectiveMonthly(data: FormData, id: string): number {
   const item = AUTOMATIONS_CATALOG.find((a) => a.id === id);
   if (!item) return 0;
   const override = data.automationOverrides?.[id];
-  return override ? Math.max(override.monthlyPrice, item.minMonthly) : item.minMonthly;
+  return override ? override.monthlyPrice : item.minMonthly;
 }
 
 export function getEffectiveSetup(data: FormData, id: string): number {
   const item = AUTOMATIONS_CATALOG.find((a) => a.id === id);
   if (!item) return 0;
   const override = data.automationOverrides?.[id];
-  return override ? Math.max(override.setupFee, item.defaultSetup) : item.defaultSetup;
+  return override ? override.setupFee : item.defaultSetup;
 }
 
 // ============================================================
@@ -317,10 +317,10 @@ export function calculateResults(data: FormData): Results {
   // Fee final
   let feeFinal: number;
   if (data.overrideEnabled) {
-    feeFinal = Math.max(data.feeMensualOverride, minTotal);
+    feeFinal = data.feeMensualOverride;
   } else {
     const sumAllocation = Object.values(allocationPrices).reduce((s, v) => s + v, 0);
-    feeFinal = Math.max(sumAllocation, minTotal);
+    feeFinal = sumAllocation;
   }
 
   // Total setup
