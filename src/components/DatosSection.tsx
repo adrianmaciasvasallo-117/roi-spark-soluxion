@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   FormData,
+  Results,
   Frecuencia,
   formatCurrencyDecimals,
 } from '@/lib/calculations';
@@ -25,6 +26,7 @@ interface Props {
   onClear: () => void;
   derivedTarifaHora: number;
   derivedFeeSugerido: number;
+  results: Results;
 }
 
 const DatosSection = ({
@@ -34,6 +36,7 @@ const DatosSection = ({
   onClear,
   derivedTarifaHora,
   derivedFeeSugerido,
+  results,
 }: Props) => {
   const update = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     onChange({ ...data, [key]: value });
@@ -331,6 +334,46 @@ const DatosSection = ({
                 </div>
               )}
             </div>
+          </div>
+          <Separator />
+          <p className="text-xs text-muted-foreground">Impuestos aplicados al fee</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={data.ivaEnabled}
+                  onCheckedChange={(v) => update('ivaEnabled', v)}
+                />
+                <Label className="text-xs">Aplicar IVA</Label>
+              </div>
+              {data.ivaEnabled && (
+                <div className="space-y-1">
+                  <Label className="text-xs">IVA (%)</Label>
+                  {numInput('ivaPorcentaje', { min: '0', max: '100' })}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={data.irpfEnabled}
+                  onCheckedChange={(v) => update('irpfEnabled', v)}
+                />
+                <Label className="text-xs">Retención IRPF</Label>
+              </div>
+              {data.irpfEnabled && (
+                <div className="space-y-1">
+                  <Label className="text-xs">IRPF (%)</Label>
+                  {numInput('irpfPorcentaje', { min: '0', max: '100' })}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="h-9 px-3 flex items-center bg-muted rounded-md text-xs font-medium gap-1 flex-wrap">
+            <span>Base: {formatCurrencyDecimals(results.baseImponible)}</span>
+            {data.ivaEnabled && <span>+ IVA: {formatCurrencyDecimals(results.ivaAmount)}</span>}
+            {data.irpfEnabled && <span>− IRPF: {formatCurrencyDecimals(results.irpfAmount)}</span>}
+            <span className="font-bold">= {formatCurrencyDecimals(results.totalConImpuestos)}/mes</span>
           </div>
         </CardContent>
       </Card>
