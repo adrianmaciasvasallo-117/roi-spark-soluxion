@@ -169,7 +169,7 @@ export const DEFAULT_FORM_DATA: FormData = {
   costeSetup: 0,
   overrideEnabled: false,
   feeMensualOverride: 0,
-  autoDistributeRemainder: true,
+  
 
   ivaEnabled: true,
   ivaPorcentaje: 21,
@@ -307,26 +307,6 @@ export function calculateResults(data: FormData): Results {
     allocationPrices[id] = getEffectiveMonthly(data, id);
   });
 
-  // Auto-distribute remainder
-  if (data.autoDistributeRemainder && !data.overrideEnabled) {
-    const targetMonthly = feeSugerido;
-    const remainder = Math.max(0, targetMonthly - baseMonthlySum);
-    if (remainder > 0) {
-      // Priority: email > crm > last selected
-      const priority = ['email', 'crm'];
-      let assigned = false;
-      for (const pid of priority) {
-        if (data.selectedAutomations.includes(pid)) {
-          allocationPrices[pid] = (allocationPrices[pid] || 0) + remainder;
-          assigned = true;
-          break;
-        }
-      }
-      if (!assigned && data.selectedAutomations.length > 0) {
-        const last = data.selectedAutomations[data.selectedAutomations.length - 1];
-        allocationPrices[last] = (allocationPrices[last] || 0) + remainder;
-      }
-    }
   }
 
   // Fee final
