@@ -124,6 +124,11 @@ export interface FormData {
   feeMensualOverride: number;
   autoDistributeRemainder: boolean;
 
+  ivaEnabled: boolean;
+  ivaPorcentaje: number;
+  irpfEnabled: boolean;
+  irpfPorcentaje: number;
+
   selectedAutomations: string[];
   /** Per-automation price overrides keyed by automation id */
   automationOverrides: Record<string, AutomationPriceOverride>;
