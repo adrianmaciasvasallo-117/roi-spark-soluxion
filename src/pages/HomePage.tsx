@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import { Badge } from '@/components/ui/badge';
 import { useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 
 interface HistoryEntry {
   id: string;
@@ -26,6 +27,21 @@ const HomePage = () => {
       setHistory(all);
     } catch { /* empty */ }
   }, []);
+
+  const deleteEntry = (entry: HistoryEntry) => {
+    const key = entry.type === 'entrevista' ? 'soluxion_interviews' : 'soluxion_onboardings';
+    try {
+      const arr: HistoryEntry[] = JSON.parse(localStorage.getItem(key) || '[]');
+      localStorage.setItem(key, JSON.stringify(arr.filter(e => e.id !== entry.id)));
+    } catch { /* empty */ }
+    setHistory(prev => prev.filter(e => e.id !== entry.id));
+  };
+
+  const clearAll = () => {
+    localStorage.removeItem('soluxion_interviews');
+    localStorage.removeItem('soluxion_onboardings');
+    setHistory([]);
+  };
 
   const tools = [
     {
@@ -97,25 +113,45 @@ const HomePage = () => {
           ))}
         </div>
 
-        {history.length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold mb-3">Historial reciente</h3>
-            <div className="space-y-2">
-              {history.map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between bg-card border rounded-md px-4 py-2.5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{entry.type === 'entrevista' ? '🎯' : '⚙️'}</span>
-                    <div>
-                      <p className="text-sm font-medium">{entry.nombre}</p>
-                      <p className="text-xs text-muted-foreground">{entry.sector} · {entry.fecha}</p>
+        <div>
+          <h3 className="text-sm font-semibold mb-3">Historial reciente</h3>
+          {history.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No hay registros guardados</p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {history.map((entry) => (
+                  <div key={entry.id} className="flex items-center justify-between bg-card border rounded-md px-4 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{entry.type === 'entrevista' ? '🎯' : '⚙️'}</span>
+                      <div>
+                        <p className="text-sm font-medium">{entry.nombre}</p>
+                        <p className="text-xs text-muted-foreground">{entry.sector} · {entry.fecha}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {resultBadge(entry.resultado)}
+                      <button
+                        type="button"
+                        onClick={() => deleteEntry(entry)}
+                        className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                  {resultBadge(entry.resultado)}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-xs text-muted-foreground hover:text-destructive underline mt-3"
+              >
+                Limpiar historial
+              </button>
+            </>
+          )}
+        </div>
       </main>
     </div>
   );
