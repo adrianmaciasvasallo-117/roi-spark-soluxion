@@ -28,6 +28,21 @@ const HomePage = () => {
     } catch { /* empty */ }
   }, []);
 
+  const deleteEntry = (entry: HistoryEntry) => {
+    const key = entry.type === 'entrevista' ? 'soluxion_interviews' : 'soluxion_onboardings';
+    try {
+      const arr: HistoryEntry[] = JSON.parse(localStorage.getItem(key) || '[]');
+      localStorage.setItem(key, JSON.stringify(arr.filter(e => e.id !== entry.id)));
+    } catch { /* empty */ }
+    setHistory(prev => prev.filter(e => e.id !== entry.id));
+  };
+
+  const clearAll = () => {
+    localStorage.removeItem('soluxion_interviews');
+    localStorage.removeItem('soluxion_onboardings');
+    setHistory([]);
+  };
+
   const tools = [
     {
       emoji: '📊',
