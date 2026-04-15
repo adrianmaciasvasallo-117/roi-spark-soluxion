@@ -26,6 +26,7 @@ interface Answers {
   // economic
   contratar: string;
   presupuesto: string;
+  cuandoEmpezar: string;
   notas: string;
 }
 
@@ -43,6 +44,7 @@ const DEFAULT_ANSWERS: Answers = {
   sectorQ2: '',
   contratar: '',
   presupuesto: '',
+  cuandoEmpezar: '',
   notas: '',
 };
 
@@ -54,11 +56,14 @@ function calcularPuntuacion(a: Answers): 'cualificado' | 'potencial' | 'no_momen
   else if (a.ocupado >= 2) score += 1;
   if (a.finde === 'siempre') score += 2;
   else if (a.finde === 'aveces') score += 1;
-  if (a.presupuesto === 'cualquiera') score += 3;
+  if (a.presupuesto === 'mas_800') score += 4;
+  else if (a.presupuesto === '500_800') score += 3;
   else if (a.presupuesto === '300_500') score += 2;
   else if (a.presupuesto === '100_300') score += 1;
   if (a.contratar === 'caro') score += 2;
   else if (a.contratar === 'pensado') score += 1;
+  if (a.cuandoEmpezar === 'semana') score += 2;
+  else if (a.cuandoEmpezar === '2semanas') score += 1;
   if (score >= 9) return 'cualificado';
   if (score >= 5) return 'potencial';
   return 'no_momento';
@@ -313,6 +318,7 @@ const EntrevistaPage = () => {
               <div className="flex justify-between"><span className="text-muted-foreground">Ocupado</span><span className="font-medium">{answers.ocupado}/5</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Fines de semana</span><span className="font-medium">{answers.finde}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Presupuesto</span><span className="font-medium">{answers.presupuesto}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">¿Cuándo empezar?</span><span className="font-medium">{answers.cuandoEmpezar}</span></div>
             </CardContent>
           </Card>
 
@@ -472,10 +478,26 @@ const EntrevistaPage = () => {
                   { label: 'Menos de 100€/mes', value: 'menos_100' },
                   { label: '100€–300€/mes', value: '100_300' },
                   { label: '300€–500€/mes', value: '300_500' },
-                  { label: 'Lo que sea si los números cuadran', value: 'cualquiera' },
+                  { label: '500€–800€/mes', value: '500_800' },
+                  { label: 'Más de 800€/mes si los números cuadran', value: 'mas_800' },
                 ]}
                 value={answers.presupuesto}
                 onChange={(v) => set('presupuesto', v)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Si el presupuesto te cuadra, ¿cuándo te gustaría empezar?</Label>
+              <OptionButtons
+                stacked
+                options={[
+                  { label: 'Esta misma semana', value: 'semana' },
+                  { label: 'En las próximas 2 semanas', value: '2semanas' },
+                  { label: 'El mes que viene', value: 'mes_que_viene' },
+                  { label: 'Aún no lo tengo claro', value: 'no_claro' },
+                ]}
+                value={answers.cuandoEmpezar}
+                onChange={(v) => set('cuandoEmpezar', v)}
               />
             </div>
           </div>
