@@ -471,7 +471,7 @@ const EntrevistaPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">¿En qué rango estarías cómodo invirtiendo al mes?</Label>
+              <Label className="text-sm font-medium"><Label className="text-sm font-medium">Si esta solución de inteligencia artificial os soluciona el problema, ¿cuánto estarías dispuesto a pagar al mes?</Label></Label>
               <OptionButtons
                 stacked
                 options={[
